@@ -53,7 +53,7 @@ const NinePebblesPage: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1500); 
+    }, 1000); // Reduced skeleton loading time
     return () => clearTimeout(timer);
   }, []);
 
@@ -64,26 +64,33 @@ const NinePebblesPage: React.FC = () => {
   }, []);
 
 
-  const executeSwitchPlayerAndPhase = useCallback((effectiveGamePhase: GamePhase, effectivePlayerStats: typeof playerStats) => {
+  const executeSwitchPlayerAndPhase = useCallback((currentPhaseForLogic: GamePhase, effectivePlayerStats: typeof playerStats) => {
     const nextPlayer = currentPlayer === 1 ? 2 : 1;
+    let nextPhase = currentPhaseForLogic; // Start with the current phase
 
-    if (effectivePlayerStats[1].pawnsToPlace === 0 && effectivePlayerStats[2].pawnsToPlace === 0 && effectiveGamePhase === 'placement') {
-      setGamePhase('movement');
-      setPawnsToPlaceThisTurn(0);
-      setIsCurrentPlayerOnInitialTwoPawnTurn(false);
-    } else if (effectiveGamePhase === 'placement') {
+    // Determine if placement is fully complete for both players
+    const allPawnsPlacedByBoth = effectivePlayerStats[1].pawnsToPlace === 0 && effectivePlayerStats[2].pawnsToPlace === 0;
+
+    if (allPawnsPlacedByBoth && currentPhaseForLogic === 'placement') {
+        nextPhase = 'movement'; // Transition to movement phase
+        setPawnsToPlaceThisTurn(0);
+        setIsCurrentPlayerOnInitialTwoPawnTurn(false);
+    } else if (currentPhaseForLogic === 'placement') { // Still in placement phase
         let numToPlaceForNextPlayerTurn = 1;
         let nextPlayerIsOnInitialTurn = false;
         if (!effectivePlayerStats[nextPlayer].hasCompletedInitialTwoPawnPlacement && effectivePlayerStats[nextPlayer].pawnsToPlace > 0) {
             numToPlaceForNextPlayerTurn = 2;
             nextPlayerIsOnInitialTurn = true;
         }
+        // Ensure the player doesn't place more than they have left
         const actualCanPlaceNext = Math.min(numToPlaceForNextPlayerTurn, effectivePlayerStats[nextPlayer].pawnsToPlace);
         setPawnsToPlaceThisTurn(actualCanPlaceNext);
         setIsCurrentPlayerOnInitialTwoPawnTurn(nextPlayerIsOnInitialTurn && actualCanPlaceNext === 2);
     }
-    setCurrentPlayer(nextPlayer);
-  }, [currentPlayer]);
+    
+    setGamePhase(nextPhase); // Update the game phase
+    setCurrentPlayer(nextPlayer); // Switch player
+}, [currentPlayer]);
 
 
   const updateMessageAndPawnsToPlace = useCallback(() => {
@@ -108,7 +115,8 @@ const NinePebblesPage: React.FC = () => {
       } else if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
          setMessage("All pawns placed. Movement phase commencing.");
       } else {
-         setMessage(`${currentPlayerName}'s turn. You have no more pawns to place this turn, or overall for placement.`);
+         // This case should ideally not be hit if logic is correct, or means turn switch pending
+         setMessage(`${currentPlayerName}'s turn is processing or pawns are exhausted.`);
       }
     } else if (gamePhase === 'movement') {
       setMessage(`${currentPlayerName}'s turn. Select a pawn to move.`);
@@ -202,7 +210,7 @@ const NinePebblesPage: React.FC = () => {
       1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
       2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
     });
-    setPawnsToPlaceThisTurn(2); 
+    setPawnsToPlaceThisTurn(Math.min(2, PAWNS_PER_PLAYER));
     setIsCurrentPlayerOnInitialTwoPawnTurn(true); 
     
     toast({ 
@@ -240,7 +248,12 @@ const NinePebblesPage: React.FC = () => {
                  updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
             }
             setPlayerStats(updatedPlayerStats); 
-            executeSwitchPlayerAndPhase(gamePhase, updatedPlayerStats);
+            
+            let effectivePhaseForSwitch = gamePhase;
+             if (updatedPlayerStats[1].pawnsToPlace === 0 && updatedPlayerStats[2].pawnsToPlace === 0) {
+                 effectivePhaseForSwitch = 'movement';
+             }
+            executeSwitchPlayerAndPhase(effectivePhaseForSwitch, updatedPlayerStats);
           } else {
             setPlayerStats(updatedPlayerStats);
             setPawnsToPlaceThisTurn(remainingForThisActionSequence);
@@ -273,19 +286,18 @@ const NinePebblesPage: React.FC = () => {
           setMovingPawn({ from: fromIndex, to: movedPawnIndex, player: currentPlayer });
           setSelectedPawnIndex(null); 
           
-          // Delay board update until after animation might conceptually start
           setTimeout(() => {
             setBoard(newBoard);
-            setMovingPawn(null); // Animation handled by GameBoardDisplay
+            setMovingPawn(null); 
 
             if (checkMill(newBoard, currentPlayer, movedPawnIndex)) {
               setGamePhase('removing');
             } else {
               if (!checkWinCondition(newBoard, updatedPlayerStats)) { 
-                  executeSwitchPlayerAndPhase(gamePhase, updatedPlayerStats); 
+                executeSwitchPlayerAndPhase(gamePhase, updatedPlayerStats); 
               }
             }
-          }, 100); // Small delay for visual effect before logic proceeds
+          }, 100); 
 
         } else {
           toast({ title: "Invalid Move", description: "You can only move to an adjacent empty spot.", variant: "destructive" });
@@ -311,7 +323,7 @@ const NinePebblesPage: React.FC = () => {
             let boardAfterRemoval = [...newBoard]; 
             boardAfterRemoval[index] = null; 
             
-            let statsAfterRemoval = JSON.parse(JSON.stringify(playerStats)); // Use current playerStats
+            let statsAfterRemoval = JSON.parse(JSON.stringify(playerStats));
             statsAfterRemoval[opponent].pawnsOnBoard -= 1;
 
             setBoard(boardAfterRemoval); 
@@ -322,24 +334,25 @@ const NinePebblesPage: React.FC = () => {
             if (!gameWon) {
                 const stillInPlacementPhaseOverall = statsAfterRemoval[1].pawnsToPlace > 0 || statsAfterRemoval[2].pawnsToPlace > 0;
                 
-                if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) { // Current player had more placements this turn
+                if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) { 
                     setPlayerStats(statsAfterRemoval); 
                     setGamePhase('placement'); 
-                    // Message will update due to useEffect
-                } else { // Current player's turn actions are done (or was movement phase)
+                    updateMessageAndPawnsToPlace();
+                } else { 
                     let finalStatsForThisTurn = JSON.parse(JSON.stringify(statsAfterRemoval));
-                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0) { 
+                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0 && !finalStatsForThisTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement) { 
                         finalStatsForThisTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
                     }
                     setPlayerStats(finalStatsForThisTurn); 
                     
                     const nextPhaseAfterRemoval = stillInPlacementPhaseOverall ? 'placement' : 'movement';
                     setGamePhase(nextPhaseAfterRemoval);
-                    updateMessageAndPawnsToPlace();
+                    updateMessageAndPawnsToPlace(); // Update message before switching player
                     executeSwitchPlayerAndPhase(nextPhaseAfterRemoval, finalStatsForThisTurn); 
                 }
             } else {
                  setPlayerStats(statsAfterRemoval); 
+                 updateMessageAndPawnsToPlace(); // Update message for win
             }
         }, PAWN_REMOVAL_ANIMATION_DURATION);
 
@@ -407,35 +420,40 @@ const NinePebblesPage: React.FC = () => {
         </div>
       </header>
 
-      <Alert variant="default" className="w-full mb-3 sm:mb-4 bg-card">
-        <Info className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-        <AlertTitle className="font-semibold text-sm sm:text-base">
-          <Skeleton className="h-5 w-1/3" />
+      <Alert variant="default" className="w-full max-w-xs sm:max-w-sm mx-auto mb-2 sm:mb-3 rounded-xl shadow-lg bg-card">
+        <Info className="h-4 w-4 text-primary" />
+        <AlertTitle className="font-semibold text-xs">
+          <Skeleton className="h-4 w-1/3" />
         </AlertTitle>
-        <Skeleton className="h-4 w-full mt-1" />
+        <Skeleton className="h-3 w-full mt-1" />
       </Alert>
       
       <main className="flex-grow w-full flex flex-col md:flex-row items-center md:items-start md:justify-between gap-3 sm:gap-4 lg:gap-6">
-        <div className="w-full md:w-1/5 md:max-w-[180px] lg:max-w-[200px] order-1 md:order-1 p-3 rounded-lg border bg-card shadow-md">
-          <div className="flex items-center justify-between mb-1.5">
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="w-7 h-7 rounded-full" />
-          </div>
-          <Skeleton className="h-4 w-20 mb-1" />
-          <Skeleton className="h-4 w-20" />
+        <div className="w-full md:w-auto order-1 md:order-1">
+          <Card className="p-3 rounded-lg border bg-card shadow-md min-w-[150px] md:min-w-[180px]">
+            <div className="flex items-center justify-between mb-1.5">
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="w-7 h-7 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-20 mb-1" />
+            <Skeleton className="h-4 w-20" />
+          </Card>
         </div>
 
-        <div className="w-full md:w-3/5 order-3 md:order-2 max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
+
+        <div className="w-full md:flex-grow order-3 md:order-2 max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
           <Skeleton className="w-full h-full rounded-lg" />
         </div>
 
-        <div className="w-full md:w-1/5 md:max-w-[180px] lg:max-w-[200px] order-2 md:order-3 p-3 rounded-lg border bg-card shadow-md">
-          <div className="flex items-center justify-between mb-1.5">
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="w-7 h-7 rounded-full" />
-          </div>
-          <Skeleton className="h-4 w-20 mb-1" />
-          <Skeleton className="h-4 w-20" />
+        <div className="w-full md:w-auto order-2 md:order-3">
+           <Card className="p-3 rounded-lg border bg-card shadow-md min-w-[150px] md:min-w-[180px]">
+            <div className="flex items-center justify-between mb-1.5">
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="w-7 h-7 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-20 mb-1" />
+            <Skeleton className="h-4 w-20" />
+          </Card>
         </div>
       </main>
       <footer className="text-center py-4 mt-auto text-sm text-muted-foreground">
@@ -473,18 +491,32 @@ const NinePebblesPage: React.FC = () => {
       </header>
 
       {!winner && (
-        <Alert 
-          variant={ (currentPlayer === 2 && !winner) ? 'destructive' : 'default'}
-          className={`w-full mb-3 sm:mb-4 text-xs sm:text-sm shadow-md ${
-            (currentPlayer === 2 && !winner) ? 'border-destructive/60 bg-destructive/5' : 'border-primary/60 bg-primary/5'
-          }`}
-        >
-          <Info className={`h-4 w-4 sm:h-5 sm:w-5 ${(currentPlayer === 2 && !winner) ? 'text-destructive' : 'text-primary'}`} />
-          <AlertTitle className="font-semibold text-sm sm:text-base font-heading">
-             {gamePhase === 'animatingRemoval' || gamePhase === 'removing' ? 'Mill Formed!' : `${getPlayerThematicName(currentPlayer)}'s Turn`}
-          </AlertTitle>
-          <AlertDescription className="min-h-[1.5em]">{message}</AlertDescription>
-        </Alert>
+         <Alert
+            variant={(currentPlayer === 2 && !winner) ? 'destructive' : 'default'}
+            className={`
+              w-full max-w-xs sm:max-w-sm mx-auto mb-2 sm:mb-3
+              rounded-xl shadow-lg
+              ${(currentPlayer === 2 && !winner) 
+                ? 'border-destructive/50 bg-destructive/10' 
+                : 'border-primary/50 bg-primary/10'}
+            `}
+          >
+            <Info className={`h-4 w-4 ${(currentPlayer === 2 && !winner) ? 'text-destructive' : 'text-primary'}`} />
+            <AlertTitle 
+              className={`font-semibold text-xs font-heading ${
+                (currentPlayer === 2 && !winner) ? 'text-destructive' : 'text-primary'
+              }`}
+            >
+                {gamePhase === 'animatingRemoval' || gamePhase === 'removing' ? 'Mill Formed!' : `${getPlayerThematicName(currentPlayer)}'s Turn`}
+            </AlertTitle>
+            <AlertDescription 
+              className={`text-xs min-h-[1.2em] ${
+                (currentPlayer === 2 && !winner) ? 'text-destructive/90' : 'text-primary/90'
+              }`}
+            >
+              {message}
+            </AlertDescription>
+          </Alert>
       )}
 
       {winner && (
@@ -502,8 +534,9 @@ const NinePebblesPage: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-grow w-full flex flex-col md:flex-row items-center md:items-start md:justify-between gap-3 sm:gap-4 lg:gap-6">
-        <div className="w-full md:w-1/5 md:max-w-[180px] lg:max-w-[200px] xl:max-w-[220px] order-1 md:order-1">
+      <main className="flex-grow w-full flex flex-col md:flex-row items-center md:items-start md:justify-center gap-3 sm:gap-4 lg:gap-6 relative">
+        {/* Player 1 Status - Positioned on Left for md screens, top-left for sm */}
+        <div className="w-full md:w-auto order-1 md:absolute md:left-0 md:top-0 md:h-full md:flex md:items-center">
            <PlayerStatusDisplay
             player={1}
             playerName={getPlayerThematicName(1)}
@@ -514,7 +547,8 @@ const NinePebblesPage: React.FC = () => {
           />
         </div>
         
-        <div className="w-full md:w-3/5 order-3 md:order-2 max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
+        {/* Game Board - Centered */}
+        <div className="w-full md:flex-grow-0 order-3 md:order-2 max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center mx-auto">
           <GameBoardDisplay
             board={board}
             onPointClick={handlePointClick}
@@ -527,7 +561,8 @@ const NinePebblesPage: React.FC = () => {
           />
         </div>
 
-        <div className="w-full md:w-1/5 md:max-w-[180px] lg:max-w-[200px] xl:max-w-[220px] order-2 md:order-3">
+        {/* Player 2 Status - Positioned on Right for md screens, top-right for sm */}
+        <div className="w-full md:w-auto order-2 md:absolute md:right-0 md:top-0 md:h-full md:flex md:items-center">
            <PlayerStatusDisplay
             player={2}
             playerName={getPlayerThematicName(2)}

@@ -11,19 +11,19 @@ interface DragonProps {
 }
 
 const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animationDuration }) => {
-  const headScale = 2.2; 
-  const bodySegmentLength = headScale * 1.8;
-  const bodySegmentWidth = headScale * 0.9;
+  const headScale = 2.0; // Slightly reduced for finer details
+  const bodySegmentBaseLength = headScale * 1.5; // Base length for segments
+  const bodySegmentBaseWidth = headScale * 0.7; // Base width
 
   const [visualTransform, setVisualTransform] = useState(`translate(${currentPos.x}px, ${currentPos.y}px) rotate(0deg)`);
   const [currentAngle, setCurrentAngle] = useState(0);
   
-  const segmentCount = 4; 
+  const segmentCount = 6; // Increased segment count for more detail
   const [segmentStyles, setSegmentStyles] = useState<React.CSSProperties[]>(
     Array(segmentCount).fill({}).map((_, i) => ({
-      transform: `translateX(${-i * bodySegmentLength * 0.7}px) translateY(0px) rotate(0deg)`, 
+      transform: `translateX(${-i * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`, 
       transformOrigin: '100% 50%', 
-      transition: `transform ${animationDuration * 0.3}ms cubic-bezier(0.4, 0, 0.2, 1)`
+      transition: `transform ${animationDuration * 0.35}ms cubic-bezier(0.45, 0.05, 0.55, 0.95)` // Smoother bezier
     }))
   );
   
@@ -46,8 +46,8 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
 
   useEffect(() => {
     if (isMoving && animationDuration > 0) {
-      const windingAmplitudeBase = bodySegmentWidth * 0.3; 
-      const windingCycles = 2; 
+      const windingAmplitudeBase = bodySegmentBaseWidth * 0.35; 
+      const windingCycles = 2.5; // Increased cycles for more serpentine motion
 
       const animateWinding = (timestamp: number) => {
         if (startTimeRef.current === null) {
@@ -55,33 +55,42 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
         }
         const elapsedTime = timestamp - startTimeRef.current;
         const progress = Math.min(elapsedTime / animationDuration, 1);
+        const easedProgress = 0.5 - 0.5 * Math.cos(progress * Math.PI); // Ease in-out for progress
 
         if (progress < 1) {
           const newSegmentStyles = segmentStyles.map((_, i) => {
-            if (i === 0) return segmentStyles[0]; 
+            if (i === 0) return segmentStyles[0]; // Head segment is controlled by main transform
             
-            const amplitude = windingAmplitudeBase * (1 + i * 0.2);
-            const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.8; 
+            // Make tail segments wind more
+            const amplitudeFactor = 1 + (i / segmentCount) * 0.5;
+            const amplitude = windingAmplitudeBase * amplitudeFactor * (1 - Math.abs(0.5 - easedProgress) * 2 * 0.3); // Dampen at start/end of move
             
-            const waveAngle = windingCycles * progress * 2 * Math.PI;
+            const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.7; 
+            const waveAngle = windingCycles * easedProgress * 2 * Math.PI;
             
             const offsetY = amplitude * Math.sin(waveAngle + phaseShift);
-            const segmentRotation = Math.sin(waveAngle + phaseShift + Math.PI/2) * 10 * (progress < 0.5 ? progress * 2 : (1-progress) * 2) ; 
+            
+            // Rotation effect to make segments "bend"
+            const segmentRotationFactor = (i / segmentCount); // Tail segments rotate more
+            const segmentRotation = Math.cos(waveAngle + phaseShift + Math.PI/2) * 15 * segmentRotationFactor * (easedProgress < 0.5 ? easedProgress * 2 : (1-easedProgress) * 2);
+
+            // Adjust translateX to create more overlap and compression/extension
+            const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.05 * (i/segmentCount);
 
             return {
               ...segmentStyles[i],
-              transform: `translateX(${-i * bodySegmentLength * 0.65}px) translateY(${offsetY}px) rotate(${segmentRotation}deg)`,
+              transform: `translateX(${-i * bodySegmentBaseLength * dynamicLengthFactor}px) translateY(${offsetY}px) rotate(${segmentRotation}deg)`,
               transformOrigin: '100% 50%', 
-              transition: `transform ${animationDuration * 0.25}ms cubic-bezier(0.4, 0, 0.2, 1)`
+              transition: `transform ${animationDuration * 0.2}ms cubic-bezier(0.33, 1, 0.68, 1)` // Faster, more responsive segment transition
             };
           });
           setSegmentStyles(newSegmentStyles);
           animationFrameIdRef.current = requestAnimationFrame(animateWinding);
         } else {
           const finalStyles = Array(segmentCount).fill({}).map((_,i) => ({
-              transform: `translateX(${-i * bodySegmentLength * 0.65}px) translateY(0px) rotate(0deg)`,
+              transform: `translateX(${-i * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`,
               transformOrigin: '100% 50%',
-              transition: `transform ${animationDuration * 0.25}ms cubic-bezier(0.4, 0, 0.2, 1)`
+              transition: `transform ${animationDuration * 0.3}ms cubic-bezier(0.25, 0.1, 0.25, 1)`
           }));
           setSegmentStyles(finalStyles);
           startTimeRef.current = null;    
@@ -90,9 +99,9 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       animationFrameIdRef.current = requestAnimationFrame(animateWinding);
     } else if (!isMoving) {
          const finalStyles = Array(segmentCount).fill({}).map((_,i) => ({
-            transform: `translateX(${-i * bodySegmentLength * 0.65}px) translateY(0px) rotate(0deg)`,
+            transform: `translateX(${-i * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`,
             transformOrigin: '100% 50%',
-            transition: `transform ${animationDuration * 0.25}ms cubic-bezier(0.4, 0, 0.2, 1)`
+            transition: `transform ${animationDuration * 0.3}ms cubic-bezier(0.25, 0.1, 0.25, 1)`
         }));
         setSegmentStyles(finalStyles);
       startTimeRef.current = null;
@@ -108,7 +117,7 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       startTimeRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMoving, animationDuration, bodySegmentWidth, bodySegmentLength]);
+  }, [isMoving, animationDuration, bodySegmentBaseWidth, bodySegmentBaseLength]);
 
 
   const primaryDragonColor = "fill-red-600 dark:fill-red-500";
@@ -116,129 +125,134 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
   const accentDragonColor = "fill-orange-500 dark:fill-orange-400";
   const eyeColor = "fill-green-400 dark:fill-green-300";
   const hornColor = "fill-neutral-300 dark:fill-neutral-400";
-  const shadowStroke = "stroke-black/10 dark:stroke-black/30";
-  const detailStrokeWidth = "0.1";
-  const mainStrokeWidth = "0.15";
+  const shadowStroke = "stroke-black/15 dark:stroke-black/35"; // Slightly darker shadow
+  const detailStrokeWidth = "0.08"; // Thinner for more detailed look
+  const mainStrokeWidth = "0.12";
+
+  // Helper for creating oval paths
+  const createOvalPath = (cx: number, cy: number, rx: number, ry: number, rotation = 0) => {
+    return `M ${cx - rx},${cy} 
+            A ${rx},${ry} ${rotation} 0 1 ${cx + rx},${cy} 
+            A ${rx},${ry} ${rotation} 0 1 ${cx - rx},${cy} Z`;
+  };
+  
+  const segmentsRender: JSX.Element[] = [];
+
+  for (let i = segmentCount - 1; i > 0; i--) { // Render tail to body, head is separate
+    const isTailEnd = i === segmentCount - 1;
+    const segmentLength = bodySegmentBaseLength * (1 - (i / segmentCount) * 0.2); // Segments taper slightly
+    const segmentWidth = bodySegmentBaseWidth * (1 - (i / segmentCount) * 0.3);
+
+    segmentsRender.push(
+      <g key={`segment-${i}`} style={segmentStyles[i]}>
+        {/* Main segment oval */}
+        <ellipse 
+          cx={-segmentLength * 0.4} 
+          cy="0" 
+          rx={segmentLength * 0.6} 
+          ry={segmentWidth * 0.55} 
+          className={`${primaryDragonColor} ${i % 2 === 0 ? 'opacity-90' : 'opacity-80'} ${shadowStroke}`} 
+          strokeWidth={detailStrokeWidth} 
+        />
+        {/* Smaller overlay oval for texture/detail */}
+        <ellipse 
+          cx={-segmentLength * 0.35} 
+          cy="0" 
+          rx={segmentLength * 0.4} 
+          ry={segmentWidth * 0.35} 
+          className={`${secondaryDragonColor} opacity-60`} 
+        />
+        {/* Dorsal scales/spikes - simplified for smaller segments */}
+        { i < segmentCount -1 && // No scales on the very last tail segment if it's a fin
+          <>
+            <path d={`M ${-segmentLength * 0.1} ${-segmentWidth * 0.4} L ${-segmentLength * 0.15} ${-segmentWidth * 0.6} L ${-segmentLength * 0.2} ${-segmentWidth * 0.4} Z`} className={`${accentDragonColor} opacity-70`} />
+            <path d={`M ${-segmentLength * 0.5} ${-segmentWidth * 0.4} L ${-segmentLength * 0.55} ${-segmentWidth * 0.6} L ${-segmentLength * 0.6} ${-segmentWidth * 0.4} Z`} className={`${accentDragonColor} opacity-70`} />
+          </>
+        }
+         {/* Tail Fin for the last segment */}
+        {isTailEnd && (
+          <g transform={`translate(${-segmentLength * 0.8}, 0)`}>
+            <path d={`M 0 0 
+                       L ${-segmentLength * 0.4} ${segmentWidth * 0.4} 
+                       L ${-segmentLength * 0.3} 0
+                       L ${-segmentLength * 0.4} ${-segmentWidth * 0.4} Z`} 
+                  className={`${accentDragonColor} opacity-90`} />
+            <path d={`M ${-segmentLength * 0.35} ${segmentWidth * 0.15}
+                       L ${-segmentLength * 0.6} ${segmentWidth * 0.5}
+                       L ${-segmentLength * 0.5} ${segmentWidth * 0.15} Z`}
+                 className={`${accentDragonColor} opacity-60`} transform="rotate(15, -0.4, 0)" />
+          </g>
+        )}
+      </g>
+    );
+  }
+
 
   return (
     <g
       style={{
         transform: visualTransform,
-        transition: isMoving ? `transform ${animationDuration}ms cubic-bezier(0.65, 0, 0.35, 1)` : 'none', 
+        transition: isMoving ? `transform ${animationDuration}ms cubic-bezier(0.55, 0.06, 0.68, 0.19)` : 'none',  // Adjusted cubic-bezier for head movement
         transformOrigin: '0 0', 
         pointerEvents: 'none',
       }}
     >
-      {/* Segment 3 (Tail) */}
-      <g style={segmentStyles[3]}>
-        <path d={`M 0 0 
-                  C ${-bodySegmentLength * 0.3} ${bodySegmentWidth * 0.3}, ${-bodySegmentLength * 0.6} ${bodySegmentWidth * 0.2}, ${-bodySegmentLength} 0
-                  C ${-bodySegmentLength * 0.6} ${-bodySegmentWidth * 0.2}, ${-bodySegmentLength * 0.3} ${-bodySegmentWidth * 0.3}, 0 0 Z`} 
-              className={`${primaryDragonColor} opacity-80 ${shadowStroke}`} strokeWidth={detailStrokeWidth} />
-        {/* Elaborate Tail Fin */}
-        <path d={`M ${-bodySegmentLength * 0.9} 0 
-                   L ${-bodySegmentLength * 1.2} ${bodySegmentWidth * 0.3} 
-                   L ${-bodySegmentLength * 1.1} 0
-                   L ${-bodySegmentLength * 1.2} ${-bodySegmentWidth * 0.3} Z`} 
-              className={`${accentDragonColor} opacity-90`} />
-        <path d={`M ${-bodySegmentLength * 1.05} ${bodySegmentWidth * 0.15}
-                   L ${-bodySegmentLength * 1.3} ${bodySegmentWidth * 0.4}
-                   L ${-bodySegmentLength * 1.2} ${bodySegmentWidth * 0.15} Z`}
-             className={`${accentDragonColor} opacity-70`} transform="rotate(15, -1.1, 0)" />
-        <path d={`M ${-bodySegmentLength * 1.05} ${-bodySegmentWidth * 0.15}
-                   L ${-bodySegmentLength * 1.3} ${-bodySegmentWidth * 0.4}
-                   L ${-bodySegmentLength * 1.2} ${-bodySegmentWidth * 0.15} Z`}
-             className={`${accentDragonColor} opacity-70`} transform="rotate(-15, -1.1, 0)" />
-      </g>
-
-      {/* Segment 2 (Body) */}
-      <g style={segmentStyles[2]}>
-        <ellipse cx={-bodySegmentLength * 0.5} cy="0" rx={bodySegmentLength * 0.55} ry={bodySegmentWidth * 0.55} 
-                 className={`${primaryDragonColor} opacity-90 ${shadowStroke}`} strokeWidth={detailStrokeWidth}/>
-        <ellipse cx={-bodySegmentLength * 0.5} cy="0" rx={bodySegmentLength * 0.4} ry={bodySegmentWidth * 0.35} 
-                 className={`${secondaryDragonColor} opacity-60`}/>
-        {/* Dorsal Spines */}
-        <path d={`M ${-bodySegmentLength * 0.2} ${-bodySegmentWidth*0.45} L ${-bodySegmentLength * 0.3} ${-bodySegmentWidth*0.7} L ${-bodySegmentLength * 0.4} ${-bodySegmentWidth*0.45} Z`} className={`${accentDragonColor} opacity-80`} />
-        <path d={`M ${-bodySegmentLength * 0.6} ${-bodySegmentWidth*0.45} L ${-bodySegmentLength * 0.7} ${-bodySegmentWidth*0.7} L ${-bodySegmentLength * 0.8} ${-bodySegmentWidth*0.45} Z`} className={`${accentDragonColor} opacity-80`} />
-      </g>
-
-      {/* Segment 1 (Body near Head) */}
-      <g style={segmentStyles[1]}>
-         <ellipse cx={-bodySegmentLength * 0.5} cy="0" rx={bodySegmentLength * 0.58} ry={bodySegmentWidth * 0.6} 
-                  className={`${primaryDragonColor} ${shadowStroke}`} strokeWidth={detailStrokeWidth}/>
-         <ellipse cx={-bodySegmentLength * 0.5} cy="0" rx={bodySegmentLength * 0.45} ry={bodySegmentWidth * 0.4} 
-                  className={`${secondaryDragonColor} opacity-70`}/>
-        {/* Underbelly Plates */}
-        <path d={`M ${-bodySegmentLength * 0.2} ${bodySegmentWidth*0.1} 
-                C ${-bodySegmentLength * 0.3} ${bodySegmentWidth*0.2}, ${-bodySegmentLength * 0.4} ${bodySegmentWidth*0.2}, ${-bodySegmentLength * 0.5} ${bodySegmentWidth*0.1}
-                L ${-bodySegmentLength * 0.5} ${-bodySegmentWidth*0.1}
-                C ${-bodySegmentLength * 0.4} ${-bodySegmentWidth*0.2}, ${-bodySegmentLength * 0.3} ${-bodySegmentWidth*0.2}, ${-bodySegmentLength * 0.2} ${-bodySegmentWidth*0.1} Z`}
-              className={`${secondaryDragonColor} opacity-40`} />
-         <path d={`M ${-bodySegmentLength * 0.55} ${bodySegmentWidth*0.08} 
-                C ${-bodySegmentLength * 0.65} ${bodySegmentWidth*0.18}, ${-bodySegmentLength * 0.75} ${bodySegmentWidth*0.18}, ${-bodySegmentLength * 0.85} ${bodySegmentWidth*0.08}
-                L ${-bodySegmentLength * 0.85} ${-bodySegmentWidth*0.08}
-                C ${-bodySegmentLength * 0.75} ${-bodySegmentWidth*0.18}, ${-bodySegmentLength * 0.65} ${-bodySegmentWidth*0.18}, ${-bodySegmentLength * 0.55} ${-bodySegmentWidth*0.08} Z`}
-              className={`${secondaryDragonColor} opacity-40`} />
-        {/* Dorsal Spines */}
-        <path d={`M ${-bodySegmentLength * 0.25} ${-bodySegmentWidth*0.5} L ${-bodySegmentLength * 0.35} ${-bodySegmentWidth*0.8} L ${-bodySegmentLength * 0.45} ${-bodySegmentWidth*0.5} Z`} className={`${accentDragonColor}`} />
-        <path d={`M ${-bodySegmentLength * 0.65} ${-bodySegmentWidth*0.5} L ${-bodySegmentLength * 0.75} ${-bodySegmentWidth*0.8} L ${-bodySegmentLength * 0.85} ${-bodySegmentWidth*0.5} Z`} className={`${accentDragonColor}`} />
-
-      </g>
+      {/* Render body segments */}
+      {segmentsRender}
       
       {/* Head (Segment 0) */}
       <g style={segmentStyles[0]}>
         {/* Horns - more detailed */}
-        <path d={`M ${headScale * -0.2} ${headScale * -0.3} C ${headScale * -0.9} ${headScale * -1}, ${headScale * -1.5} ${headScale * -0.7}, ${headScale * -1.1} ${headScale * 0.1} L ${headScale * -1.2} ${headScale * -0.1} C ${headScale * -1.3} ${headScale * -0.6}, ${headScale * -0.7} ${headScale * -0.8}, ${headScale * -0.2} ${headScale * -0.35} Z`} className={`${hornColor} stroke-black/20`} strokeWidth={detailStrokeWidth}/>
-        <path d={`M ${headScale * -0.2} ${headScale * 0.3} C ${headScale * -0.9} ${headScale * 1}, ${headScale * -1.5} ${headScale * 0.7}, ${headScale * -1.1} ${headScale * -0.1} L ${headScale * -1.2} ${headScale * 0.1} C ${headScale * -1.3} ${headScale * 0.6}, ${headScale * -0.7} ${headScale * 0.8}, ${headScale * -0.2} ${headScale * 0.35} Z`} className={`${hornColor} stroke-black/20`} strokeWidth={detailStrokeWidth}/>
+        <path d={`M ${headScale * -0.2} ${headScale * -0.3} C ${headScale * -0.8} ${headScale * -0.9}, ${headScale * -1.3} ${headScale * -0.6}, ${headScale * -1.0} ${headScale * 0.1} L ${headScale * -1.1} ${headScale * -0.1} C ${headScale * -1.2} ${headScale * -0.5}, ${headScale * -0.6} ${headScale * -0.7}, ${headScale * -0.2} ${headScale * -0.35} Z`} className={`${hornColor} stroke-black/25`} strokeWidth={detailStrokeWidth}/>
+        <path d={`M ${headScale * -0.2} ${headScale * 0.3} C ${headScale * -0.8} ${headScale * 0.9}, ${headScale * -1.3} ${headScale * 0.6}, ${headScale * -1.0} ${headScale * -0.1} L ${headScale * -1.1} ${headScale * 0.1} C ${headScale * -1.2} ${headScale * 0.5}, ${headScale * -0.6} ${headScale * 0.7}, ${headScale * -0.2} ${headScale * 0.35} Z`} className={`${hornColor} stroke-black/25`} strokeWidth={detailStrokeWidth}/>
 
-        {/* Head Shape */}
-        <ellipse cx="0" cy="0" rx={headScale * 0.8} ry={headScale * 0.6} className={`${primaryDragonColor} stroke-black/20 dark:stroke-black/40`} strokeWidth={mainStrokeWidth} />
-        {/* Snout */}
-        <ellipse cx={headScale * 0.6} cy="0" rx={headScale * 0.5} ry={headScale * 0.4} className={`${primaryDragonColor} stroke-black/20 dark:stroke-black/40`} strokeWidth={detailStrokeWidth}/>
+        {/* Head Shape using ovals*/}
+        <path d={createOvalPath(0, 0, headScale * 0.75, headScale * 0.55)} className={`${primaryDragonColor} stroke-black/25 dark:stroke-black/45`} strokeWidth={mainStrokeWidth} />
+        {/* Snout using ovals */}
+        <path d={createOvalPath(headScale * 0.55, 0, headScale * 0.45, headScale * 0.35)} className={`${primaryDragonColor} stroke-black/25 dark:stroke-black/45`} strokeWidth={detailStrokeWidth}/>
         
         {/* Fangs */}
-        <path d={`M ${headScale * 0.8} ${headScale * 0.15} L ${headScale * 0.9} ${headScale * 0.3} L ${headScale * 1} ${headScale * 0.15} Z`} className="fill-neutral-100 dark:fill-neutral-300" />
-        <path d={`M ${headScale * 0.8} ${-headScale * 0.15} L ${headScale * 0.9} ${-headScale * 0.3} L ${headScale * 1} ${-headScale * 0.15} Z`} className="fill-neutral-100 dark:fill-neutral-300" />
+        <path d={`M ${headScale * 0.75} ${headScale * 0.12} L ${headScale * 0.85} ${headScale * 0.25} L ${headScale * 0.95} ${headScale * 0.12} Z`} className="fill-neutral-100 dark:fill-neutral-300" />
+        <path d={`M ${headScale * 0.75} ${-headScale * 0.12} L ${headScale * 0.85} ${-headScale * 0.25} L ${headScale * 0.95} ${-headScale * 0.12} Z`} className="fill-neutral-100 dark:fill-neutral-300" />
 
         {/* Eyes */}
-        <circle cx={headScale * 0.3} cy={-headScale * 0.25} r={headScale * 0.18} className={eyeColor} />
-        <circle cx={headScale * 0.32} cy={-headScale * 0.25} r={headScale * 0.08} className="fill-black" />
-        <circle cx={headScale * 0.31} cy={-headScale * 0.23} r={headScale * 0.03} className="fill-white/70 dark:fill-white/50" /> {/* Glint */}
+        <circle cx={headScale * 0.28} cy={-headScale * 0.23} r={headScale * 0.16} className={eyeColor} />
+        <circle cx={headScale * 0.30} cy={-headScale * 0.23} r={headScale * 0.07} className="fill-black" />
+        <circle cx={headScale * 0.29} cy={-headScale * 0.21} r={headScale * 0.025} className="fill-white/70 dark:fill-white/50" /> {/* Glint */}
 
-        <circle cx={headScale * 0.3} cy={headScale * 0.25} r={headScale * 0.18} className={eyeColor} />
-        <circle cx={headScale * 0.32} cy={headScale * 0.25} r={headScale * 0.08} className="fill-black" />
-        <circle cx={headScale * 0.31} cy={headScale * 0.27} r={headScale * 0.03} className="fill-white/70 dark:fill-white/50" /> {/* Glint */}
+        <circle cx={headScale * 0.28} cy={headScale * 0.23} r={headScale * 0.16} className={eyeColor} />
+        <circle cx={headScale * 0.30} cy={headScale * 0.23} r={headScale * 0.07} className="fill-black" />
+        <circle cx={headScale * 0.29} cy={headScale * 0.25} r={headScale * 0.025} className="fill-white/70 dark:fill-white/50" /> {/* Glint */}
 
         {/* Nostrils */}
-        <ellipse cx={headScale * 0.95} cy={-headScale * 0.08} rx={headScale * 0.08} ry={headScale * 0.04} className="fill-black/30 dark:fill-black/50" transform={`rotate(15, ${headScale * 0.95}, ${-headScale * 0.08})`} />
-        <ellipse cx={headScale * 0.95} cy={headScale * 0.08} rx={headScale * 0.08} ry={headScale * 0.04} className="fill-black/30 dark:fill-black/50" transform={`rotate(-15, ${headScale * 0.95}, ${headScale * 0.08})`} />
-
+        <ellipse cx={headScale * 0.9} cy={-headScale * 0.07} rx={headScale * 0.07} ry={headScale * 0.035} className="fill-black/35 dark:fill-black/55" transform={`rotate(15, ${headScale * 0.9}, ${-headScale * 0.07})`} />
+        <ellipse cx={headScale * 0.9} cy={headScale * 0.07} rx={headScale * 0.07} ry={headScale * 0.035} className="fill-black/35 dark:fill-black/55" transform={`rotate(-15, ${headScale * 0.9}, ${headScale * 0.07})`} />
 
         {/* Whiskers */}
-        <path d={`M ${headScale * 0.8} ${headScale * 0.1} Q ${headScale * 1.6} ${headScale * 0.5}, ${headScale * 1.3} ${headScale * 0.9} M ${headScale * 1.3} ${headScale * 0.9} Q ${headScale * 1.7} ${headScale * 1.1}, ${headScale * 1.4} ${headScale * 1.3}`} strokeWidth="0.15" className={`${secondaryDragonColor} opacity-80 fill-none stroke-current`} />
-        <path d={`M ${headScale * 0.8} ${-headScale * 0.1} Q ${headScale * 1.6} ${-headScale * 0.5}, ${headScale * 1.3} ${-headScale * 0.9} M ${headScale * 1.3} ${-headScale * 0.9} Q ${headScale * 1.7} ${-headScale * 1.1}, ${headScale * 1.4} ${-headScale * 1.3}`} strokeWidth="0.15" className={`${secondaryDragonColor} opacity-80 fill-none stroke-current`} />
+        <path d={`M ${headScale * 0.75} ${headScale * 0.09} Q ${headScale * 1.4} ${headScale * 0.4}, ${headScale * 1.15} ${headScale * 0.8} M ${headScale * 1.15} ${headScale * 0.8} Q ${headScale * 1.5} ${headScale * 1.0}, ${headScale * 1.25} ${headScale * 1.2}`} strokeWidth="0.12" className={`${secondaryDragonColor} opacity-80 fill-none stroke-current`} />
+        <path d={`M ${headScale * 0.75} ${-headScale * 0.09} Q ${headScale * 1.4} ${-headScale * 0.4}, ${headScale * 1.15} ${-headScale * 0.8} M ${headScale * 1.15} ${-headScale * 0.8} Q ${headScale * 1.5} ${-headScale * 1.0}, ${headScale * 1.25} ${-headScale * 1.2}`} strokeWidth="0.12" className={`${secondaryDragonColor} opacity-80 fill-none stroke-current`} />
         
          {/* Mane/Frill - more detailed */}
-        <path d={`M ${headScale * -0.5} 0 
-                   Q ${headScale * -0.9} ${headScale * -0.7}, ${headScale * -1.3} ${headScale * -0.9} 
-                   L ${headScale * -1.5} ${headScale * -0.8}
-                   Q ${headScale * -1.0} ${headScale * -0.5}, ${headScale * -0.55} ${headScale * -0.1} Z`} 
-              className={`${accentDragonColor} opacity-70`} />
-        <path d={`M ${headScale * -0.6} -0.05
-                   Q ${headScale * -0.95} ${headScale * -0.5}, ${headScale * -1.35} ${headScale * -0.7} 
-                   L ${headScale * -1.45} ${headScale * -0.6}
-                   Q ${headScale * -1.05} ${headScale * -0.3}, ${headScale * -0.65} ${headScale * -0.15} Z`} 
-              className={`${primaryDragonColor} opacity-50`} />
-         <path d={`M ${headScale * -0.5} 0 
-                   Q ${headScale * -0.9} ${headScale * 0.7}, ${headScale * -1.3} ${headScale * 0.9} 
-                   L ${headScale * -1.5} ${headScale * 0.8}
-                   Q ${headScale * -1.0} ${headScale * 0.5}, ${headScale * -0.55} ${headScale * 0.1} Z`} 
-              className={`${accentDragonColor} opacity-70`}/>
-        <path d={`M ${headScale * -0.6} 0.05
-                   Q ${headScale * -0.95} ${headScale * 0.5}, ${headScale * -1.35} ${headScale * 0.7} 
-                   L ${headScale * -1.45} ${headScale * 0.6}
-                   Q ${headScale * -1.05} ${headScale * 0.3}, ${headScale * -0.65} ${headScale * 0.15} Z`} 
-              className={`${primaryDragonColor} opacity-50`} />
+        <path d={`M ${headScale * -0.45} 0 
+                   Q ${headScale * -0.8} ${headScale * -0.6}, ${headScale * -1.2} ${headScale * -0.8} 
+                   L ${headScale * -1.4} ${headScale * -0.7}
+                   Q ${headScale * -0.9} ${headScale * -0.4}, ${headScale * -0.5} ${headScale * -0.1} Z`} 
+              className={`${accentDragonColor} opacity-75`} />
+        <path d={`M ${headScale * -0.55} -0.05
+                   Q ${headScale * -0.85} ${headScale * -0.4}, ${headScale * -1.25} ${headScale * -0.6} 
+                   L ${headScale * -1.35} ${headScale * -0.5}
+                   Q ${headScale * -0.95} ${headScale * -0.2}, ${headScale * -0.6} ${headScale * -0.15} Z`} 
+              className={`${primaryDragonColor} opacity-55`} />
+         <path d={`M ${headScale * -0.45} 0 
+                   Q ${headScale * -0.8} ${headScale * 0.6}, ${headScale * -1.2} ${headScale * 0.8} 
+                   L ${headScale * -1.4} ${headScale * 0.7}
+                   Q ${headScale * -0.9} ${headScale * 0.4}, ${headScale * -0.5} ${headScale * 0.1} Z`} 
+              className={`${accentDragonColor} opacity-75`}/>
+        <path d={`M ${headScale * -0.55} 0.05
+                   Q ${headScale * -0.85} ${headScale * 0.4}, ${headScale * -1.25} ${headScale * 0.6} 
+                   L ${headScale * -1.35} ${headScale * 0.5}
+                   Q ${headScale * -0.95} ${headScale * 0.2}, ${headScale * -0.6} ${headScale * 0.15} Z`} 
+              className={`${primaryDragonColor} opacity-55`} />
       </g>
     </g>
   );

@@ -95,15 +95,15 @@ export default {
           '0%, 100%': { filter: 'drop-shadow(0 0 1.5px currentColor) drop-shadow(0 0 2.5px currentColor) opacity(0.6)' },
           '50%': { filter: 'drop-shadow(0 0 3px currentColor) drop-shadow(0 0 5px currentColor) opacity(0.9)' },
         },
-        'halo-pulse': { // Renamed from halo-shimmer for clarity
+        'halo-pulse': { 
           '0%, 100%': { opacity: '0.7', transform: 'scale(1)' },
           '50%': { opacity: '1', transform: 'scale(1.05)' },
         },
-        'angel-wings-gentle-flap': { // Renamed for clarity
+        'angel-wings-gentle-flap': { 
           '0%, 100%': { transform: 'translateY(0px) scaleY(1)' },
           '50%': { transform: 'translateY(-0.5px) scaleY(1.05)' },
         },
-        'demon-horns-glow': { // Renamed from demon-horns-opac
+        'demon-horns-glow': { 
           '0%, 100%': { opacity: '0.8', filter: 'brightness(1)' },
           '50%': { opacity: '1', filter: 'brightness(1.2)' },
         },
@@ -114,21 +114,21 @@ export default {
           '60%': { transform: 'scaleY(0.98) rotate(1deg)' },
           '80%': { transform: 'scaleY(1) rotate(0deg)' },
         },
-        'demon-tail-whip': { // Renamed from demon-tail-flick
+        'demon-tail-whip': { 
           '0%, 100%': { transform: 'rotate(0deg) translateX(0)' },
           '25%': { transform: 'rotate(-12deg) translateX(0.2px)' },
           '50%': { transform: 'rotate(8deg) translateX(-0.1px)' },
           '75%': { transform: 'rotate(-5deg) translateX(0.1px)' },
         },
-        'holy-dispel': { // For angel pawn being removed by demon
+        'holy-dispel': { 
           '0%': { opacity: '1', filter: 'brightness(1) drop-shadow(0 0 3px hsl(var(--primary)))' },
           '50%': { opacity: '0.7', filter: 'brightness(1.5) drop-shadow(0 0 8px hsl(var(--primary)))', transform: 'scale(1.1)' },
           '100%': { opacity: '0', filter: 'brightness(2) drop-shadow(0 0 15px hsl(var(--primary)))', transform: 'scale(0.5)' },
         },
-        'hellish-banish': { // For demon pawn being removed by angel
-          '0%': { opacity: '1', filter: 'brightness(1) drop-shadow(0 0 3px hsl(var(--accent)))' },
-          '50%': { opacity: '0.7', filter: 'brightness(1.5) drop-shadow(0 0 8px hsl(var(--accent)))', transform: 'scale(1.1) rotate(5deg)' },
-          '100%': { opacity: '0', filter: 'brightness(2) drop-shadow(0 0 15px hsl(var(--accent)))', transform: 'scale(0.5) rotate(-10deg)' },
+        'hellish-banish': { 
+          '0%': { opacity: '1', filter: 'brightness(1) drop-shadow(0 0 3px hsl(var(--destructive)))' }, // Changed from accent to destructive
+          '50%': { opacity: '0.7', filter: 'brightness(1.5) drop-shadow(0 0 8px hsl(var(--destructive)))', transform: 'scale(1.1) rotate(5deg)' }, // Changed from accent to destructive
+          '100%': { opacity: '0', filter: 'brightness(2) drop-shadow(0 0 15px hsl(var(--destructive)))', transform: 'scale(0.5) rotate(-10deg)' }, // Changed from accent to destructive
         },
   		},
   		animation: {

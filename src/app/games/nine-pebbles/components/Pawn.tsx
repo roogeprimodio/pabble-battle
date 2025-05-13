@@ -28,15 +28,15 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
   const displayRadius = size === 'small' ? 2.5 : radius;
   const scaleFactor = displayRadius / 3; // Original design details were based on radius ~3
 
-  const player1ColorClasses = "fill-primary stroke-primary-foreground/50 dark:stroke-black/40";
-  const player1DetailFill = "fill-primary-foreground/90"; // Slightly more opaque
+  const player1ColorClasses = "fill-primary stroke-primary-foreground/70 dark:stroke-black/50"; // Angel: Primary color
+  const player1DetailFill = "fill-primary-foreground/90";
   
-  const player2ColorClasses = "fill-accent stroke-accent-foreground/50 dark:stroke-black/40";
-  const player2DetailFill = "fill-accent-foreground/90"; // Slightly more opaque
+  const player2ColorClasses = "fill-destructive stroke-destructive-foreground/70 dark:stroke-black/50"; // Demon: Destructive color
+  const player2DetailFill = "fill-destructive-foreground/90";
 
   const commonPawnClasses = "transition-all duration-150 ease-in-out";
   const selectionGlowClass = isSelected 
-    ? (player === 1 ? "animate-subtle-glow text-primary" : "animate-subtle-glow text-accent") 
+    ? (player === 1 ? "animate-subtle-glow text-primary" : "animate-subtle-glow text-destructive") // Demon glow uses destructive
     : "";
 
   let removalAnimationClass = "";
@@ -71,19 +71,19 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
           </g>
         ) : ( // Demon design
           <g transform={`scale(${scaleFactor})`}>
-            <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.2" />
+            <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.25" />
             {/* Sharper Horns - with a subtle glow/pulse */}
             <g className="animate-demon-horns-glow">
-              <path d="M -1.0 -2.6 C -1.8 -4.5 0.5 -4.0 0.3 -2.8 L -0.6 -2.5 Z" className={`${player2DetailFill}`} transform="rotate(-20 0 0)" />
-              <path d="M 1.0 -2.6 C 1.8 -4.5 -0.5 -4.0 -0.3 -2.8 L 0.6 -2.5 Z" className={`${player2DetailFill}`} transform="rotate(20 0 0)" />
+              <path d="M -0.8 -2.5 C -1.5 -4.8 -0.2 -4.5 0.1 -2.7 L -0.5 -2.3 Z" className={`${player2DetailFill} opacity-90`} transform="rotate(-25 0 0)" />
+              <path d="M 0.8 -2.5 C 1.5 -4.8 0.2 -4.5 -0.1 -2.7 L 0.5 -2.3 Z" className={`${player2DetailFill} opacity-90`} transform="rotate(25 0 0)" />
             </g>
             {/* Small Bat-like Wings */}
             <g className="animate-demon-wings-twitch">
-                <path d="M -1.5 0 C -3.5 -1.5 -2.5 -2.8 -1.0 -2.0 Z" className={`${player2DetailFill} opacity-60`} transform="rotate(10 -1 0)"/>
-                <path d="M 1.5 0 C 3.5 -1.5 2.5 -2.8 1.0 -2.0 Z" className={`${player2DetailFill} opacity-60`} transform="rotate(-10 1 0)"/>
+                <path d="M -1.5 0.2 C -3.2 -1.2 -2.8 -2.5 -1.2 -1.8 L -1.0 -0.5 Z" className={`${player2DetailFill} opacity-70`} transform="rotate(15 -1 0)"/>
+                <path d="M 1.5 0.2 C 3.2 -1.2 2.8 -2.5 1.2 -1.8 L 1.0 -0.5 Z" className={`${player2DetailFill} opacity-70`} transform="rotate(-15 1 0)"/>
             </g>
             {/* More Dynamic Pointy Tail */}
-            <path d="M 0 2.8 Q 1.2 4.5 0 5.3 Q -1.2 4.5 0 2.8 Z" className={`${player2DetailFill} opacity-80 animate-demon-tail-whip`} style={{ transformOrigin: '0px 2.8px' }} />
+            <path d="M 0 2.9 Q 0.6 3.8 0.2 5.0 L 0 5.5 L -0.2 5.0 Q -0.6 3.8 0 2.9 Z" className={`${player2DetailFill} opacity-85 animate-demon-tail-whip`} style={{ transformOrigin: '0px 2.9px' }} />
           </g>
         )}
       </g>
@@ -95,7 +95,7 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
   const statusScaleFactor = (size === 'small' ? 1.9 : 2.3) / 3.0; 
 
   return (
-    <div className={`${statusPawnSizeClass} rounded-full shadow-sm flex items-center justify-center ${isSelected ? (player === 1 ? 'ring-2 ring-offset-1 ring-primary' : 'ring-2 ring-offset-1 ring-accent') : ''}`}>
+    <div className={`${statusPawnSizeClass} rounded-full shadow-sm flex items-center justify-center ${isSelected ? (player === 1 ? 'ring-2 ring-offset-1 ring-primary' : 'ring-2 ring-offset-1 ring-destructive') : ''}`}>
       <svg viewBox="-4.5 -5.5 9 11" className="w-full h-full overflow-visible"> 
         {player === 1 ? ( // Angel (Simplified for status)
           <g transform={`scale(${statusScaleFactor})`}>
@@ -109,10 +109,10 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
           <g transform={`scale(${statusScaleFactor})`}>
             <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.3"/>
              {/* Simplified Horns for status */}
-            <path d="M -1.0 -2.6 C -1.8 -4.2 0.4 -3.9 0.3 -2.8 Z" className={`${player2DetailFill} opacity-80`} transform="rotate(-20 0 0)" />
-            <path d="M 1.0 -2.6 C 1.8 -4.2 -0.4 -3.9 -0.3 -2.8 Z" className={`${player2DetailFill} opacity-80`} transform="rotate(20 0 0)" />
+            <path d="M -0.8 -2.5 C -1.5 -4.5 0.2 -4.2 0.1 -2.7 Z" className={`${player2DetailFill} opacity-80`} transform="rotate(-22 0 0)" />
+            <path d="M 0.8 -2.5 C 1.5 -4.5 -0.2 -4.2 -0.1 -2.7 Z" className={`${player2DetailFill} opacity-80`} transform="rotate(22 0 0)" />
              {/* Simplified Tail for status */}
-            <path d="M 0 2.8 Q 0.9 4.0 0 4.6 Q -0.9 4.0 0 2.8 Z" className={`${player2DetailFill} opacity-70`} />
+            <path d="M 0 2.9 Q 0.7 3.8 0 4.8 Q -0.7 3.8 0 2.9 Z" className={`${player2DetailFill} opacity-75`} />
           </g>
         )}
       </svg>

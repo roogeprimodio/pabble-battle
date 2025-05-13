@@ -1,6 +1,8 @@
 export type Player = 1 | 2;
 export type BoardPosition = Player | null;
 export type GameBoardArray = BoardPosition[]; // Array of 24 positions
+export type GamePhase = 'playerSelection' | 'placement' | 'movement' | 'removing' | 'animatingRemoval' | 'gameOver';
+
 
 export const TOTAL_POINTS = 24;
 export const PAWNS_PER_PLAYER = 9;

@@ -4,7 +4,7 @@
 import React from 'react';
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
 import PlayerPawnDisplay from './Pawn';
-import { POINT_COORDINATES, ADJACENCY_LIST } from '@/lib/nine-pebbles-rules';
+import { POINT_COORDINATES, ADJACENCY_LIST, canRemovePawn } from '@/lib/nine-pebbles-rules';
 
 interface GameBoardDisplayProps {
   board: GameBoardArray;
@@ -13,7 +13,7 @@ interface GameBoardDisplayProps {
   gamePhase: string; 
   currentPlayer: Player;
   winner: Player | null;
-  pawnToRemoveIndex: number | null; // New prop to indicate which pawn is currently targeted for removal
+  pawnToRemoveIndex: number | null; 
 }
 
 const boardPoints = POINT_COORDINATES.map(p => ({
@@ -92,11 +92,11 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
         {boardPoints.map((point) => {
           const playerAtPoint = board[point.id];
           const isCurrentlySelectedPawn = selectedPawnIndex === point.id;
-          const isTargetedForRemoval = gamePhase === 'removing' && playerAtPoint && playerAtPoint !== currentPlayer;
           
           let pointInteractionClass = "cursor-default";
           let hoverEffectClass = "";
           let pointMarkerClass = "fill-foreground/20 dark:fill-foreground/30 transition-colors";
+          let highlightForRemovable: Player | null = null;
 
           if (gamePhase === 'placement' && !playerAtPoint) {
             pointInteractionClass = "cursor-pointer";
@@ -112,10 +112,10 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             }
           } else if (gamePhase === 'removing' && playerAtPoint && playerAtPoint !== currentPlayer) {
             pointInteractionClass = "cursor-pointer";
-             // Highlight removable pawns
-            pointMarkerClass = playerAtPoint === 1 
-                ? "fill-primary/30 dark:fill-primary/40 group-hover:fill-primary/50" 
-                : "fill-accent/30 dark:fill-accent/40 group-hover:fill-accent/50";
+            const opponent = currentPlayer === 1 ? 2 : 1;
+            if (playerAtPoint === opponent && canRemovePawn(board, point.id, opponent)) {
+              highlightForRemovable = currentPlayer; // Current player is the one who can remove
+            }
           }
           
           return (
@@ -133,14 +133,15 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                   cy={point.cy} 
                   radius={pointRadius} 
                   isSelected={isCurrentlySelectedPawn && playerAtPoint === currentPlayer}
-                  isBeingRemoved={pawnToRemoveIndex === point.id && gamePhase === 'removing'}
-                  removalPlayer={pawnToRemoveIndex === point.id ? currentPlayer : null}
+                  isBeingRemoved={pawnToRemoveIndex === point.id && gamePhase === 'animatingRemoval'} // For final removal animation
+                  removalPlayer={pawnToRemoveIndex === point.id ? currentPlayer : null} // Who is doing the final removal
+                  highlightAsRemovableCandidateForPlayer={highlightForRemovable} // For candidate highlight
                 />
               ) : ( 
                 <circle
                   cx={point.cx}
                   cy={point.cy}
-                  r={pointRadius * 0.65} // Slightly larger empty point markers
+                  r={pointRadius * 0.65} 
                   className={pointMarkerClass}
                 />
               )}
@@ -148,27 +149,11 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                     <circle
                         cx={point.cx}
                         cy={point.cy}
-                        r={pointRadius * 0.9} // Slightly larger highlight
+                        r={pointRadius * 0.9} 
                         fill="transparent"
-                        strokeDasharray="0.6 0.6" // More visible dashes
+                        strokeDasharray="0.6 0.6" 
                         className={`pointer-events-none animate-pulse ${currentPlayer === 1 ? 'stroke-primary/70' : 'stroke-accent/70'}`}
                         strokeWidth="0.6"
-                    />
-                )}
-                {/* Highlight for removable pawn */}
-                {isTargetedForRemoval && (
-                   <circle
-                        cx={point.cx}
-                        cy={point.cy}
-                        r={pointRadius * 1.5} 
-                        fill="transparent"
-                        className={`pointer-events-none animate-pulse ${
-                            playerAtPoint === 1 
-                            ? 'stroke-red-500/70 dark:stroke-red-400/70' 
-                            : 'stroke-red-500/70 dark:stroke-red-400/70' // Both use red for "danger" to remove
-                        }`}
-                        strokeWidth="0.7"
-                        strokeDasharray="1 1"
                     />
                 )}
             </g>

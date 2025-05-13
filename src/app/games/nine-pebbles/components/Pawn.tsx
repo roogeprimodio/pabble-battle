@@ -12,7 +12,8 @@ interface PlayerPawnDisplayProps {
   isSelected?: boolean;
   size?: 'small' | 'normal';
   isBeingRemoved?: boolean; // For holy/hellish removal animation
-  removalPlayer?: Player | null; // To determine which animation to play
+  removalPlayer?: Player | null; // To determine which animation to play for the final "poof"
+  highlightAsRemovableCandidateForPlayer?: Player | null; // Player who *can* remove this pawn
 }
 
 const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
@@ -24,6 +25,7 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
   size = 'normal',
   isBeingRemoved = false,
   removalPlayer = null,
+  highlightAsRemovableCandidateForPlayer = null,
 }) => {
   const displayRadius = size === 'small' ? 2.5 : radius;
   const scaleFactor = displayRadius / 3; // Original design details were based on radius ~3
@@ -36,7 +38,7 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
 
   const commonPawnClasses = "transition-all duration-150 ease-in-out";
   const selectionGlowClass = isSelected 
-    ? (player === 1 ? "animate-subtle-glow text-primary" : "animate-subtle-glow text-destructive") // Demon glow uses destructive
+    ? (player === 1 ? "animate-subtle-glow text-primary" : "animate-subtle-glow text-destructive")
     : "";
 
   let removalAnimationClass = "";
@@ -48,9 +50,20 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
     }
   }
 
+  let candidateHighlightClass = "";
+  if (highlightAsRemovableCandidateForPlayer && player !== highlightAsRemovableCandidateForPlayer && !isBeingRemoved) {
+    // This pawn is an opponent's pawn and is a candidate for removal
+    if (highlightAsRemovableCandidateForPlayer === 1 && player === 2) { // Angel (1) can remove this Demon (2) pawn
+      candidateHighlightClass = "animate-vulnerable-to-holy";
+    } else if (highlightAsRemovableCandidateForPlayer === 2 && player === 1) { // Demon (2) can remove this Angel (1) pawn
+      candidateHighlightClass = "animate-vulnerable-to-dark";
+    }
+  }
+
+
   if (cx !== undefined && cy !== undefined) { // SVG rendering for game board
     return (
-      <g transform={`translate(${cx}, ${cy})`} className={`${commonPawnClasses} ${selectionGlowClass} ${removalAnimationClass}`}>
+      <g transform={`translate(${cx}, ${cy})`} className={`${commonPawnClasses} ${selectionGlowClass} ${removalAnimationClass} ${candidateHighlightClass}`}>
         {player === 1 ? ( // Angel design
           <g transform={`scale(${scaleFactor})`}>
             <circle cx="0" cy="0" r="2.9" className={player1ColorClasses} strokeWidth="0.2" />

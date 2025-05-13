@@ -1,11 +1,11 @@
 // src/app/games/nine-pebbles/components/GameBoard.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Added useState, useEffect
+import React, { useState, useEffect, useCallback } from 'react';
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
 import PlayerPawnDisplay from './Pawn';
 import { POINT_COORDINATES, ADJACENCY_LIST } from '@/lib/nine-pebbles-rules';
-import Snake from './Snake'; // Import the Snake component
+import Snake from './Snake';
 
 interface GameBoardDisplayProps {
   board: GameBoardArray;
@@ -13,6 +13,7 @@ interface GameBoardDisplayProps {
   selectedPawnIndex: number | null;
   gamePhase: string; 
   currentPlayer: Player;
+  winner: Player | null; // Added winner prop
 }
 
 const boardPoints = POINT_COORDINATES.map(p => ({
@@ -44,6 +45,74 @@ const linesDef = [
   { x1: boardPoints[7].cx, y1: boardPoints[7].cy, x2: boardPoints[23].cx, y2: boardPoints[23].cy },
 ];
 
+// Helper to find *any* valid empty spot for the snake, prioritizing current if valid.
+function getSafeSnakeSpot(
+  currentSnakeIdx: number | null,
+  board: GameBoardArray
+): number | null {
+  const openSpots = board.map((p, i) => (p === null ? i : -1)).filter(i => i !== -1);
+  if (openSpots.length === 0) return null;
+
+  if (currentSnakeIdx !== null && board[currentSnakeIdx] === null) {
+    return currentSnakeIdx; // Current spot is safe and empty
+  }
+  // Current spot is unsafe or null, pick any other open spot
+  const randomIndex = Math.floor(Math.random() * openSpots.length);
+  return openSpots[randomIndex];
+}
+
+// Helper to find the NEAREST *DIFFERENT* open spot for the snake to move to.
+function findNearestNewTarget(
+  currentSnakeIdx: number, // Assumed to be a valid, empty spot
+  board: GameBoardArray,
+  adjacencyList: number[][]
+): number | null {
+  // BFS starting from currentSnakeIdx to find nearest different open spot
+  const q: { point: number; dist: number }[] = [];
+  const visited = new Set<number>([currentSnakeIdx]); // Mark current as visited initially
+  
+  // Prime queue with direct neighbors
+  for (const neighbor of adjacencyList[currentSnakeIdx]) {
+    if (board[neighbor] === null) { // If neighbor is open
+        q.push({ point: neighbor, dist: 1 }); // Add to queue
+    }
+    visited.add(neighbor); // Mark neighbor as visited to avoid re-processing at depth 1
+  }
+
+  const potentialTargets: {point: number, dist: number}[] = [];
+
+  let head = 0; // Pointer for queue to avoid excessive shift() calls
+  while(head < q.length) {
+    const current = q[head++]; // Dequeue
+
+    if (board[current.point] === null && current.point !== currentSnakeIdx) {
+      potentialTargets.push(current);
+      // Optimization: if we find any target, we can stop BFS for this level if we only want one.
+      // To find all targets at this minimum distance, continue processing all elements with current.dist
+    }
+    
+    // If we already have targets, and current item's distance is greater, stop.
+    if(potentialTargets.length > 0 && current.dist > potentialTargets[0].dist) break;
+
+    // Add its unvisited neighbors
+    for (const neighbor of adjacencyList[current.point]) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        q.push({ point: neighbor, dist: current.dist + 1 });
+      }
+    }
+  }
+  
+  if (potentialTargets.length === 0) return null; // No different open spot found
+
+  potentialTargets.sort((a,b) => { // Sort by distance, then by point index
+      if(a.dist !== b.dist) return a.dist - b.dist;
+      return a.point - b.point;
+  });
+  
+  return potentialTargets[0].point; // Return the "best" (nearest, then lowest index)
+}
+
 
 const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   board,
@@ -51,51 +120,87 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   selectedPawnIndex,
   gamePhase,
   currentPlayer,
+  winner,
 }) => {
   const pointRadius = 3; 
   const clickableRadius = 5; 
 
-  // Snake animation state
-  // A somewhat random-ish path that tries to cover different areas.
-  const [snakePath] = useState([0, 1, 9, 8, 15, 7, 6, 14, 13, 5, 4, 12, 11, 3, 2, 10, 17, 16, 23, 22, 21, 20, 19, 18].sort(() => Math.random() - 0.5).slice(0, 12));
-  const [snakeAtPointPathIndex, setSnakeAtPointPathIndex] = useState(0); // Index in snakePath where snake *is currently resting*
+  const [snakeCurrentBoardIndex, setSnakeCurrentBoardIndex] = useState<number | null>(null);
+  const [snakeTargetBoardIndex, setSnakeTargetBoardIndex] = useState<number | null>(null);
   const [snakeIsMovingToNext, setSnakeIsMovingToNext] = useState(false);
+  const [snakeVisible, setSnakeVisible] = useState(false);
 
-  const SNAKE_ANIMATION_DURATION = 900; // ms
-  const SNAKE_WAIT_DURATION = 1800; // ms
+  const SNAKE_ANIMATION_DURATION = 1200; // ms
+  const SNAKE_WAIT_DURATION = 2500; // ms
 
-  const currentRestingPoint = boardPoints[snakePath[snakeAtPointPathIndex]];
-  const nextTargetPointIndexInPath = (snakeAtPointPathIndex + 1) % snakePath.length;
-  const nextTargetPointCoords = boardPoints[snakePath[nextTargetPointIndexInPath]];
-
+  // Effect 1: Snake Placement/Correction
+  // Ensures snake is on a valid spot or hidden.
   useEffect(() => {
-    if (snakePath.length < 2) return; // Need at least 2 points for the snake to move
+    if (gamePhase === 'playerSelection' || winner !== null) {
+      setSnakeVisible(false);
+      return;
+    }
+    if (snakeIsMovingToNext) return; // Don't interfere if snake is already in transit
+
+    const safeSpot = getSafeSnakeSpot(snakeCurrentBoardIndex, board);
+
+    if (safeSpot !== null) {
+      if (snakeCurrentBoardIndex !== safeSpot) {
+        setSnakeCurrentBoardIndex(safeSpot); // Update current position if it changed
+      }
+      setSnakeVisible(true);
+    } else {
+      setSnakeVisible(false); // No safe spot, hide snake
+    }
+  }, [board, gamePhase, winner, snakeIsMovingToNext, snakeCurrentBoardIndex]);
+
+
+  // Effect 2: Snake Movement Cycle
+  // Manages the snake's decision to move and the animation timing.
+  useEffect(() => {
+    if (!snakeVisible || snakeCurrentBoardIndex === null || gamePhase === 'playerSelection' || winner !== null) {
+      return; // Snake is not active or game conditions prevent movement
+    }
 
     let waitTimer: NodeJS.Timeout;
     let animationEndTimer: NodeJS.Timeout;
 
-    if (!snakeIsMovingToNext) { // If snake is resting at a point
+    if (!snakeIsMovingToNext) { // Snake is resting, decide next move
       waitTimer = setTimeout(() => {
-        setSnakeIsMovingToNext(true); // Start moving after the wait duration
+        const target = findNearestNewTarget(snakeCurrentBoardIndex, board, ADJACENCY_LIST);
+        if (target !== null) { // target is guaranteed to be different from snakeCurrentBoardIndex
+          setSnakeTargetBoardIndex(target);
+          setSnakeIsMovingToNext(true);
+        }
+        // Else: no valid new target, snake stays put, timeout will re-evaluate on next cycle.
       }, SNAKE_WAIT_DURATION);
-    } else { // If snake is currently moving
+    } else { // Snake is moving
+      if (snakeTargetBoardIndex === null) { // Should ideally not happen if isMoving is true
+        setSnakeIsMovingToNext(false); // Reset state
+        return;
+      }
       animationEndTimer = setTimeout(() => {
-        // Snake has arrived at its target
-        setSnakeAtPointPathIndex(nextTargetPointIndexInPath); // Update its resting point
-        setSnakeIsMovingToNext(false); // Mark as no longer moving
+        setSnakeCurrentBoardIndex(snakeTargetBoardIndex); // Arrived at target
+        setSnakeTargetBoardIndex(null); // Clear target
+        setSnakeIsMovingToNext(false);  // Stop moving state
       }, SNAKE_ANIMATION_DURATION);
     }
 
-    return () => { // Cleanup timers on component unmount or when dependencies change
+    return () => { // Cleanup timers
       clearTimeout(waitTimer);
       clearTimeout(animationEndTimer);
     };
-  }, [snakeAtPointPathIndex, snakeIsMovingToNext, snakePath.length, nextTargetPointIndexInPath, SNAKE_ANIMATION_DURATION, SNAKE_WAIT_DURATION]);
+  }, [snakeVisible, snakeCurrentBoardIndex, snakeIsMovingToNext, snakeTargetBoardIndex, board, gamePhase, winner, SNAKE_ANIMATION_DURATION, SNAKE_WAIT_DURATION]);
+
+
+  const currentSnakeCoords = snakeCurrentBoardIndex !== null ? boardPoints[snakeCurrentBoardIndex] : null;
+  // If target is not set yet (e.g. snake is waiting), use current for smooth transition start
+  const targetSnakeCoords = snakeTargetBoardIndex !== null ? boardPoints[snakeTargetBoardIndex] : currentSnakeCoords;
 
 
   return (
     <div className="w-full h-full bg-secondary/20 rounded-lg shadow-inner p-2 sm:p-4 flex items-center justify-center">
-      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible"> {/* Added overflow-visible for snake */}
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible">
         {linesDef.map((line, i) => (
           <line
             key={`line-${i}`}
@@ -109,10 +214,10 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
         ))}
 
         {/* Render Snake animation */}
-        {snakePath.length >= 2 && currentRestingPoint && nextTargetPointCoords && (
+        {snakeVisible && currentSnakeCoords && targetSnakeCoords && (
           <Snake
-            currentPos={{ x: currentRestingPoint.cx, y: currentRestingPoint.cy }}
-            targetPos={{ x: nextTargetPointCoords.cx, y: nextTargetPointCoords.cy }}
+            currentPos={{ x: currentSnakeCoords.cx, y: currentSnakeCoords.cy }}
+            targetPos={{ x: targetSnakeCoords.cx, y: targetSnakeCoords.cy }}
             isMoving={snakeIsMovingToNext}
             animationDuration={SNAKE_ANIMATION_DURATION}
           />

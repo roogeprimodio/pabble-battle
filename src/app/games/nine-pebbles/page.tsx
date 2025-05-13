@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, RotateCcw, Info, Swords, Zap, ShieldQuestion, Sparkles, Skull } from 'lucide-react'; // Added Sparkles and Skull
+import { ArrowLeft, RotateCcw, Info, Swords, Zap, ShieldQuestion, Sparkles, Skull } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import GameBoardDisplay from './components/GameBoard';
 import PlayerPawnDisplay from './components/Pawn';
@@ -33,13 +33,14 @@ const NinePebblesPage: React.FC = () => {
   const [gamePhase, setGamePhase] = useState<GamePhase>('playerSelection');
   
   const [playerStats, setPlayerStats] = useState({
-    1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false, hasMadeSecondPlacement: false },
-    2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false, hasMadeSecondPlacement: false },
+    1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
+    2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
   });
   
-  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0); // Renamed from pawnsToPlaceThisAction
+  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0);
+  const [isCurrentPlayerOnInitialTwoPawnTurn, setIsCurrentPlayerOnInitialTwoPawnTurn] = useState(false);
   const [selectedPawnIndex, setSelectedPawnIndex] = useState<number | null>(null);
-  const [pawnToRemoveIndex, setPawnToRemoveIndex] = useState<number | null>(null); // For removal animation
+  const [pawnToRemoveIndex, setPawnToRemoveIndex] = useState<number | null>(null);
   const [winner, setWinner] = useState<Player | null>(null);
   const [message, setMessage] = useState<string>('Choose which side will make the first move.');
   const { toast } = useToast();
@@ -73,51 +74,22 @@ const NinePebblesPage: React.FC = () => {
     }
     
     const currentPlayerName = getPlayerThematicName(currentPlayer);
-    const currentPlayerData = playerStats[currentPlayer];
 
     if (gamePhase === 'placement') {
-      let numToPlaceThisTurn = 0;
-      if (!currentPlayerData.hasMadeFirstPlacement) {
-        numToPlaceThisTurn = 2;
-      } else if (!currentPlayerData.hasMadeSecondPlacement && currentPlayerData.pawnsToPlace >=1) { // This ensures they only get 2 if they can place 2
-        // This logic is for the *second* player's first turn to also place 2
-        const otherPlayer = currentPlayer === 1 ? 2 : 1;
-        if (playerStats[otherPlayer].hasMadeFirstPlacement && !playerStats[otherPlayer].hasMadeSecondPlacement) {
-            // If the other player has made their first placement (2 pawns)
-            // And this current player hasn't made their second placement yet (meaning this IS their first turn)
-             numToPlaceThisTurn = 2;
-        } else {
-             numToPlaceThisTurn = 1;
-        }
-
-      } else {
-        numToPlaceThisTurn = 1;
-      }
-      
-      // Ensure player doesn't place more than they have
-      const actualCanPlace = Math.min(numToPlaceThisTurn, currentPlayerData.pawnsToPlace);
-      
-      if (pawnsToPlaceThisTurn !== actualCanPlace) {
-        setPawnsToPlaceThisTurn(actualCanPlace);
-      }
-
-      if (actualCanPlace > 0) {
-        setMessage(`${currentPlayerName}'s turn. Place ${actualCanPlace} pawn${actualCanPlace > 1 ? 's' : ''}.`);
+      if (pawnsToPlaceThisTurn > 0 && playerStats[currentPlayer].pawnsToPlace > 0) {
+        setMessage(`${currentPlayerName}'s turn. Place ${pawnsToPlaceThisTurn} pawn${pawnsToPlaceThisTurn > 1 ? 's' : ''}.`);
       } else if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
          setMessage("All pawns placed. Movement phase commencing.");
       } else {
-         setMessage(`${currentPlayerName}'s turn. All your pawns for this turn are placed.`);
+         setMessage(`${currentPlayerName}'s turn. No more pawns to place this turn or overall.`);
       }
-
     } else if (gamePhase === 'movement') {
-      setPawnsToPlaceThisTurn(0);
       setMessage(`${currentPlayerName}'s turn. Select a pawn to move.`);
     } else if (gamePhase === 'removing') {
-      setPawnsToPlaceThisTurn(0);
       const icon = currentPlayer === 1 ? <Sparkles className="inline-block h-5 w-5 text-yellow-400 animate-pulse" /> : <Skull className="inline-block h-5 w-5 text-red-500 animate-pulse" />;
       setMessage(<span>{icon} {currentPlayerName} formed a line of power! Banish an opposing pawn.</span>);
     }
-  }, [gamePhase, currentPlayer, playerStats, winner, getPlayerThematicName, pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn, setMessage]);
+  }, [gamePhase, currentPlayer, playerStats, winner, getPlayerThematicName, pawnsToPlaceThisTurn]);
 
 
   useEffect(() => {
@@ -128,25 +100,23 @@ const NinePebblesPage: React.FC = () => {
   const switchPlayerAndPhase = useCallback(() => {
     const nextPlayer = currentPlayer === 1 ? 2 : 1;
     
-    // Check if all pawns are placed to transition to movement phase
     if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0 && gamePhase === 'placement') {
       setGamePhase('movement');
-    }
-    // Reset pawns to place for the next player's turn if still in placement
-    else if (gamePhase === 'placement') {
-        let numToPlaceForNext = 0;
-        const nextPlayerData = playerStats[nextPlayer];
-        if (!nextPlayerData.hasMadeFirstPlacement) {
-            numToPlaceForNext = 2;
-        } else if (!nextPlayerData.hasMadeSecondPlacement && playerStats[currentPlayer].hasMadeFirstPlacement && playerStats[currentPlayer].hasMadeSecondPlacement) {
-            // If current player has finished their "2 pawn" start, and next player is due for theirs
-            numToPlaceForNext = 2;
+      setPawnsToPlaceThisTurn(0);
+      setIsCurrentPlayerOnInitialTwoPawnTurn(false);
+    } else if (gamePhase === 'placement') {
+        let numToPlaceForNextPlayerTurn = 1;
+        let nextPlayerIsOnInitialTurn = false;
+
+        if (!playerStats[nextPlayer].hasCompletedInitialTwoPawnPlacement && playerStats[nextPlayer].pawnsToPlace > 0) {
+            numToPlaceForNextPlayerTurn = 2;
+            nextPlayerIsOnInitialTurn = true;
         }
-        else {
-            numToPlaceForNext = 1;
-        }
-        const actualCanPlaceNext = Math.min(numToPlaceForNext, nextPlayerData.pawnsToPlace);
+        
+        const actualCanPlaceNext = Math.min(numToPlaceForNextPlayerTurn, playerStats[nextPlayer].pawnsToPlace);
         setPawnsToPlaceThisTurn(actualCanPlaceNext);
+        // Only set true if they are eligible AND will actually place 2 (e.g. not if they only have 1 pawn left total)
+        setIsCurrentPlayerOnInitialTwoPawnTurn(nextPlayerIsOnInitialTurn && actualCanPlaceNext === 2);
     }
     
     setCurrentPlayer(nextPlayer);
@@ -159,13 +129,14 @@ const NinePebblesPage: React.FC = () => {
     setGamePhase('playerSelection');
     setCurrentPlayer(1); 
     setPlayerStats({
-      1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false, hasMadeSecondPlacement: false },
-      2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false, hasMadeSecondPlacement: false },
+      1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
+      2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
     });
     setSelectedPawnIndex(null);
     setPawnToRemoveIndex(null);
     setWinner(null);
     setPawnsToPlaceThisTurn(0);
+    setIsCurrentPlayerOnInitialTwoPawnTurn(false);
     toast({ 
         title: "Game Reset", 
         description: "The eternal battle begins anew. Choose your champion.",
@@ -189,9 +160,8 @@ const NinePebblesPage: React.FC = () => {
       setWinner(1); setGamePhase('gameOver'); return true;
     }
     
-    // Check for no moves scenario only during movement phase or if placement is done
     if ((gamePhase === 'movement') || (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) ) {
-        const playerToCheck = gamePhase === 'movement' ? currentPlayer : (currentPlayer === 1 ? 2 : 1) ; // if just finished placement, check opponent
+        const playerToCheck = gamePhase === 'movement' ? currentPlayer : (currentPlayer === 1 ? 2 : 1) ;
         const opponentPlayer = playerToCheck === 1 ? 2 : 1;
 
         if (updatedPlayerStats[playerToCheck].pawnsToPlace === 0 && updatedPlayerStats[playerToCheck].pawnsOnBoard >=3) {
@@ -230,10 +200,11 @@ const NinePebblesPage: React.FC = () => {
     setCurrentPlayer(player);
     setGamePhase('placement');
     setPlayerStats({ 
-      1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false, hasMadeSecondPlacement: false },
-      2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false, hasMadeSecondPlacement: false },
+      1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
+      2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
     });
-    setPawnsToPlaceThisTurn(2); // First player always places 2 initially
+    setPawnsToPlaceThisTurn(Math.min(2, PAWNS_PER_PLAYER)); 
+    setIsCurrentPlayerOnInitialTwoPawnTurn(true); 
     toast({ 
       title: "Battle Commences!", 
       description: `${getPlayerThematicName(player)} will lead the charge. Place 2 pawns.`,
@@ -248,38 +219,40 @@ const NinePebblesPage: React.FC = () => {
     let newBoard = [...board];
     let updatedPlayerStats = JSON.parse(JSON.stringify(playerStats)) as typeof playerStats;
     const currentPlayerName = getPlayerThematicName(currentPlayer);
+    const pawnsRequiredForThisAction = pawnsToPlaceThisTurn; // How many pawns this specific placement action needs.
 
     if (gamePhase === 'placement') {
-      if (newBoard[index] === null && pawnsToPlaceThisTurn > 0 && updatedPlayerStats[currentPlayer].pawnsToPlace > 0) {
+      if (newBoard[index] === null && pawnsRequiredForThisAction > 0 && updatedPlayerStats[currentPlayer].pawnsToPlace > 0) {
         newBoard[index] = currentPlayer;
         updatedPlayerStats[currentPlayer].pawnsToPlace -= 1;
         updatedPlayerStats[currentPlayer].pawnsOnBoard += 1;
         
-        const remainingForThisTurnAfterPlacement = pawnsToPlaceThisTurn - 1;
+        const remainingForThisActionSequence = pawnsRequiredForThisAction - 1;
         
         setBoard(newBoard); 
 
         if (checkMill(newBoard, currentPlayer, index)) {
-          setPawnsToPlaceThisTurn(remainingForThisTurnAfterPlacement); // Update remaining placements for this turn
-          setPlayerStats(updatedPlayerStats); 
+          setPlayerStats(updatedPlayerStats); // Save stat changes before going to removal
+          setPawnsToPlaceThisTurn(remainingForThisActionSequence); // For after removal
           setGamePhase('removing');
         } else {
-          if (remainingForThisTurnAfterPlacement === 0) { 
-             if (!updatedPlayerStats[currentPlayer].hasMadeFirstPlacement) {
-                 updatedPlayerStats[currentPlayer].hasMadeFirstPlacement = true;
-             } else if (!updatedPlayerStats[currentPlayer].hasMadeSecondPlacement) {
-                 updatedPlayerStats[currentPlayer].hasMadeSecondPlacement = true;
-             }
-             setPlayerStats(updatedPlayerStats);
-             switchPlayerAndPhase();
-          } else {
-            setPawnsToPlaceThisTurn(remainingForThisTurnAfterPlacement);
+          // No mill formed
+          if (remainingForThisActionSequence === 0) { 
+            // This turn's specific placement action (1 or 2 pawns) is complete.
+            if (isCurrentPlayerOnInitialTwoPawnTurn) { // If this *turn* was an initial 2-pawn turn
+                 updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
+            }
             setPlayerStats(updatedPlayerStats);
+            switchPlayerAndPhase(); // Sets up next player's turn
+          } else {
+            // Player still has pawns to place *in this current multi-pawn action* (e.g., placed 1 of 2).
+            setPlayerStats(updatedPlayerStats);
+            setPawnsToPlaceThisTurn(remainingForThisActionSequence);
           }
         }
       } else if (newBoard[index] !== null) {
         toast({ title: "Invalid Placement", description: "This position is already occupied.", variant: "destructive" });
-      } else if (pawnsToPlaceThisTurn === 0 || updatedPlayerStats[currentPlayer].pawnsToPlace === 0) {
+      } else if (pawnsRequiredForThisAction === 0 || updatedPlayerStats[currentPlayer].pawnsToPlace === 0) {
          toast({ title: "No Pawns to Place", description: "You have no more pawns for this turn or overall.", variant: "default" });
       }
     } else if (gamePhase === 'movement') {
@@ -315,7 +288,7 @@ const NinePebblesPage: React.FC = () => {
       const opponent = currentPlayer === 1 ? 2 : 1;
       if (newBoard[index] === opponent && canRemovePawn(newBoard, index, opponent)) {
         
-        setPawnToRemoveIndex(index); // Set pawn to animate its removal
+        setPawnToRemoveIndex(index);
         setGamePhase('animatingRemoval');
         
         const toastIcon = currentPlayer === 1 ? <Sparkles className="inline-block h-4 w-4 text-yellow-300" /> : <Skull className="inline-block h-4 w-4 text-red-400" />;
@@ -327,27 +300,33 @@ const NinePebblesPage: React.FC = () => {
         });
 
         setTimeout(() => {
-            let boardAfterRemoval = [...board]; // Use current board state for removal
+            let boardAfterRemoval = [...board]; 
             boardAfterRemoval[index] = null;
             let statsAfterRemoval = JSON.parse(JSON.stringify(playerStats));
             statsAfterRemoval[opponent].pawnsOnBoard -= 1;
 
             setBoard(boardAfterRemoval); 
-            setPlayerStats(statsAfterRemoval);
             setPawnToRemoveIndex(null);
 
             const gameWon = checkWinCondition(boardAfterRemoval, statsAfterRemoval);
             if (!gameWon) {
-                 // Determine next phase based on remaining pawns to place
                 const stillInPlacementPhaseOverall = statsAfterRemoval[1].pawnsToPlace > 0 || statsAfterRemoval[2].pawnsToPlace > 0;
-                if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) { // If current player had pending placements before forming mill
-                    setGamePhase('placement');
+                
+                // pawnsToPlaceThisTurn state holds remaining placements for this turn (e.g., 1 if mill on 1st of 2)
+                if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) {
+                    setPlayerStats(statsAfterRemoval); 
+                    setGamePhase('placement'); 
                 } else {
+                    // Placement sequence (that might have included a mill) is now complete for current player.
+                    if (isCurrentPlayerOnInitialTwoPawnTurn) { 
+                        statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
+                    }
+                    setPlayerStats(statsAfterRemoval);
                     setGamePhase(stillInPlacementPhaseOverall ? 'placement' : 'movement');
-                    switchPlayerAndPhase();
+                    switchPlayerAndPhase(); 
                 }
             } else {
-                // gamePhase will be set to 'gameOver' by checkWinCondition
+                 setPlayerStats(statsAfterRemoval); // Ensure stats are updated on win
             }
         }, PAWN_REMOVAL_ANIMATION_DURATION);
 
@@ -409,7 +388,7 @@ const NinePebblesPage: React.FC = () => {
         </h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Reset Game" disabled>
-            <RotateCcw />
+            <RotateCcw className="h-4 w-4" />
           </Button>
           <ThemeToggle />
         </div>
@@ -433,7 +412,7 @@ const NinePebblesPage: React.FC = () => {
             </Alert>
             <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
               {[1, 2].map(p => (
-                <div key={p} className={`p-2.5 rounded-md bg-primary/10 border border-primary/30`}>
+                <div key={p} className={`p-2.5 rounded-md ${p === 1 ? 'bg-primary/10 border-primary/30' : 'bg-accent/10 border-accent/30'} border`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <Skeleton className="h-5 w-16" />
                     <Skeleton className="w-7 h-7 rounded-full" />
@@ -475,7 +454,7 @@ const NinePebblesPage: React.FC = () => {
         </h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleResetGame} aria-label="Reset Game">
-            <RotateCcw />
+            <RotateCcw className="h-4 w-4" />
           </Button>
           <ThemeToggle />
         </div>

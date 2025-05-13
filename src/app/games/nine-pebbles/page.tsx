@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, RotateCcw, Info, Swords, Zap } from 'lucide-react'; // Added icons for theme
+import { ArrowLeft, RotateCcw, Info, Swords, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import GameBoardDisplay from './components/GameBoard';
 import PlayerPawnDisplay from './components/Pawn';
@@ -16,7 +16,6 @@ import {
   GameBoardArray,
   createInitialBoard,
   checkMill,
-  // getPlayerPawnCountOnBoard, // Not directly used for stats display anymore, but playerStats has it
   canRemovePawn,
   ADJACENCY_LIST,
 } from '@/lib/nine-pebbles-rules';
@@ -168,7 +167,6 @@ const NinePebblesPage: React.FC = () => {
           }
         }
       } else if (pawnsToPlaceThisAction === 0) {
-        // This case should ideally not be reached if logic is correct
         toast({ title: "Placement Phase Logic", description: "All pawns for this action placed.", variant: "default" });
       } else {
         toast({ title: "Invalid Placement", description: "This position is already occupied.", variant: "destructive" });
@@ -184,7 +182,7 @@ const NinePebblesPage: React.FC = () => {
       } else {
         if (index === selectedPawnIndex) { 
             setSelectedPawnIndex(null);
-            updateMessageAndPawnsToPlace(); // Resets message to general movement prompt
+            updateMessageAndPawnsToPlace();
             return;
         }
         if (newBoard[index] === null && ADJACENCY_LIST[selectedPawnIndex].includes(index)) {
@@ -226,14 +224,14 @@ const NinePebblesPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
-      <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-4">
+      <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-3 sm:mb-4">
         <Link href="/choose-game" passHref>
           <Button variant="outline" size="icon" aria-label="Back to Choose Game">
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center flex items-center gap-2">
-          <Swords className="h-7 w-7 text-accent" /> 9-Pebbles <Zap className="h-7 w-7 text-primary" />
+          <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> 9-Pebbles <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
         </h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={handleResetGame} aria-label="Reset Game">
@@ -243,8 +241,8 @@ const NinePebblesPage: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-grow flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 sm:gap-6 lg:gap-8">
-        <div className="w-full max-w-xl md:max-w-2xl lg:max-w-md xl:max-w-xl aspect-square relative">
+      <main className="flex-grow flex flex-col lg:flex-row items-center lg:items-start justify-center gap-3 sm:gap-4 lg:gap-6">
+        <div className="w-full max-w-[calc(100vw-32px)] sm:max-w-sm md:max-w-md lg:max-w-lg aspect-square relative self-center">
           <GameBoardDisplay
             board={board}
             onPointClick={handlePointClick}
@@ -254,23 +252,23 @@ const NinePebblesPage: React.FC = () => {
           />
         </div>
 
-        <Card className="w-full lg:w-80 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl text-center text-primary">Battle Status</CardTitle>
+        <Card className="w-full lg:w-80 shadow-lg mt-3 lg:mt-0">
+          <CardHeader className="p-4 sm:p-5">
+            <CardTitle className="text-lg sm:text-xl text-center text-primary">Battle Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
              <Alert variant={winner ? (winner === currentPlayer ? "default" : "destructive") : "default"} className={`${
                 currentPlayer === 1 ? 'border-primary/50' : 'border-accent/50'
-              } bg-card`}>
-              <Info className={`h-5 w-5 ${currentPlayer === 1 ? 'text-primary' : 'text-accent'}`} />
-              <AlertTitle className="font-semibold">
+              } bg-card text-xs sm:text-sm`}>
+              <Info className={`h-4 w-4 sm:h-5 sm:w-5 ${currentPlayer === 1 ? 'text-primary' : 'text-accent'}`} />
+              <AlertTitle className="font-semibold text-sm sm:text-base">
                 {winner ? `Battle Over!` : `${getPlayerThematicName(currentPlayer)}'s ${gamePhase.charAt(0).toUpperCase() + gamePhase.slice(1)} Phase`}
               </AlertTitle>
               <AlertDescription>{message}</AlertDescription>
             </Alert>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="p-3 rounded-md bg-primary/10 border border-primary/30">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+                <div className="p-2 rounded-md bg-primary/10 border border-primary/30">
                     <div className="flex items-center justify-between mb-1">
                         <span className="font-semibold text-primary">{getPlayerThematicName(1)}</span>
                         <PlayerPawnDisplay player={1} size="small" />
@@ -278,7 +276,7 @@ const NinePebblesPage: React.FC = () => {
                     <p>To Place: <span className="font-bold">{playerStats[1].pawnsToPlace}</span></p>
                     <p>On Board: <span className="font-bold">{playerStats[1].pawnsOnBoard}</span></p>
                 </div>
-                <div className="p-3 rounded-md bg-accent/10 border border-accent/30">
+                <div className="p-2 rounded-md bg-accent/10 border border-accent/30">
                      <div className="flex items-center justify-between mb-1">
                         <span className="font-semibold text-accent">{getPlayerThematicName(2)}</span>
                         <PlayerPawnDisplay player={2} size="small" />
@@ -289,7 +287,7 @@ const NinePebblesPage: React.FC = () => {
             </div>
             
             {winner && (
-              <Button onClick={handleResetGame} className="w-full mt-4">
+              <Button onClick={handleResetGame} className="w-full mt-3 text-sm sm:text-base py-2 sm:py-2.5">
                 Fight Again
               </Button>
             )}
@@ -301,3 +299,5 @@ const NinePebblesPage: React.FC = () => {
 };
 
 export default NinePebblesPage;
+
+    

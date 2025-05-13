@@ -1,10 +1,11 @@
 // src/app/games/nine-pebbles/components/GameBoard.tsx
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
 import PlayerPawnDisplay from './Pawn';
 import { POINT_COORDINATES, ADJACENCY_LIST } from '@/lib/nine-pebbles-rules';
+import Snake from './Snake'; // Import the Snake component
 
 interface GameBoardDisplayProps {
   board: GameBoardArray;
@@ -54,9 +55,47 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   const pointRadius = 3; 
   const clickableRadius = 5; 
 
+  // Snake animation state
+  // A somewhat random-ish path that tries to cover different areas.
+  const [snakePath] = useState([0, 1, 9, 8, 15, 7, 6, 14, 13, 5, 4, 12, 11, 3, 2, 10, 17, 16, 23, 22, 21, 20, 19, 18].sort(() => Math.random() - 0.5).slice(0, 12));
+  const [snakeAtPointPathIndex, setSnakeAtPointPathIndex] = useState(0); // Index in snakePath where snake *is currently resting*
+  const [snakeIsMovingToNext, setSnakeIsMovingToNext] = useState(false);
+
+  const SNAKE_ANIMATION_DURATION = 900; // ms
+  const SNAKE_WAIT_DURATION = 1800; // ms
+
+  const currentRestingPoint = boardPoints[snakePath[snakeAtPointPathIndex]];
+  const nextTargetPointIndexInPath = (snakeAtPointPathIndex + 1) % snakePath.length;
+  const nextTargetPointCoords = boardPoints[snakePath[nextTargetPointIndexInPath]];
+
+  useEffect(() => {
+    if (snakePath.length < 2) return; // Need at least 2 points for the snake to move
+
+    let waitTimer: NodeJS.Timeout;
+    let animationEndTimer: NodeJS.Timeout;
+
+    if (!snakeIsMovingToNext) { // If snake is resting at a point
+      waitTimer = setTimeout(() => {
+        setSnakeIsMovingToNext(true); // Start moving after the wait duration
+      }, SNAKE_WAIT_DURATION);
+    } else { // If snake is currently moving
+      animationEndTimer = setTimeout(() => {
+        // Snake has arrived at its target
+        setSnakeAtPointPathIndex(nextTargetPointIndexInPath); // Update its resting point
+        setSnakeIsMovingToNext(false); // Mark as no longer moving
+      }, SNAKE_ANIMATION_DURATION);
+    }
+
+    return () => { // Cleanup timers on component unmount or when dependencies change
+      clearTimeout(waitTimer);
+      clearTimeout(animationEndTimer);
+    };
+  }, [snakeAtPointPathIndex, snakeIsMovingToNext, snakePath.length, nextTargetPointIndexInPath, SNAKE_ANIMATION_DURATION, SNAKE_WAIT_DURATION]);
+
+
   return (
     <div className="w-full h-full bg-secondary/20 rounded-lg shadow-inner p-2 sm:p-4 flex items-center justify-center">
-      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible"> {/* Added overflow-visible for snake */}
         {linesDef.map((line, i) => (
           <line
             key={`line-${i}`}
@@ -69,10 +108,18 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
           />
         ))}
 
+        {/* Render Snake animation */}
+        {snakePath.length >= 2 && currentRestingPoint && nextTargetPointCoords && (
+          <Snake
+            currentPos={{ x: currentRestingPoint.cx, y: currentRestingPoint.cy }}
+            targetPos={{ x: nextTargetPointCoords.cx, y: nextTargetPointCoords.cy }}
+            isMoving={snakeIsMovingToNext}
+            animationDuration={SNAKE_ANIMATION_DURATION}
+          />
+        )}
+
         {boardPoints.map((point) => {
           const playerAtPoint = board[point.id];
-          // isSelected here refers to the board point/pawn index being the selected one for movement.
-          // The PlayerPawnDisplay component will use this to apply its own glow.
           const isCurrentlySelectedPawn = selectedPawnIndex === point.id;
           
           let pointInteractionClass = "cursor-default";
@@ -82,21 +129,19 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             pointInteractionClass = "cursor-pointer";
             hoverEffectClass = "hover:fill-primary/50 dark:hover:fill-primary/70";
           } else if (gamePhase === 'movement') {
-            if (playerAtPoint === currentPlayer) { // Can select own pawn
+            if (playerAtPoint === currentPlayer) { 
               pointInteractionClass = "cursor-pointer";
-              // Hover effect for selectable pawn is now mostly on the pawn itself via PlayerPawnDisplay
-            } else if (!playerAtPoint && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id)) { // Can move to adjacent empty
+            } else if (!playerAtPoint && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id)) { 
               pointInteractionClass = "cursor-pointer";
               hoverEffectClass = "hover:fill-primary/50 dark:hover:fill-primary/70";
             }
           } else if (gamePhase === 'removing' && playerAtPoint && playerAtPoint !== currentPlayer) {
             pointInteractionClass = "cursor-pointer";
-            // Hover effect for removable pawn will be on the pawn itself (e.g., slight dimming or color change if implemented in PlayerPawnDisplay)
           }
           
           return (
             <g key={`point-group-${point.id}`} onClick={() => onPointClick(point.id)} className={`group ${pointInteractionClass}`}>
-              <circle // Clickable area
+              <circle 
                 cx={point.cx}
                 cy={point.cy}
                 r={clickableRadius}
@@ -108,9 +153,9 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                   cx={point.cx} 
                   cy={point.cy} 
                   radius={pointRadius} 
-                  isSelected={isCurrentlySelectedPawn && playerAtPoint === currentPlayer} // Pass isSelected status
+                  isSelected={isCurrentlySelectedPawn && playerAtPoint === currentPlayer}
                 />
-              ) : ( // Empty point placeholder
+              ) : ( 
                 <circle
                   cx={point.cx}
                   cy={point.cy}
@@ -118,8 +163,7 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                   className={`fill-foreground/20 dark:fill-foreground/30 transition-colors ${hoverEffectClass}`}
                 />
               )}
-               {/* Highlight potential move target */}
-                {gamePhase === 'movement' && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id) && !board[point.id] && (
+               {gamePhase === 'movement' && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id) && !board[point.id] && (
                     <circle
                         cx={point.cx}
                         cy={point.cy}
@@ -128,7 +172,7 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                         stroke="hsl(var(--primary))"
                         strokeWidth="0.5"
                         strokeDasharray="0.5 0.5"
-                        className="opacity-70 pointer-events-none animate-pulse" // Added pulse for potential moves
+                        className="opacity-70 pointer-events-none animate-pulse"
                     />
                 )}
             </g>

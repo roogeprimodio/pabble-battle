@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
 import PlayerPawnDisplay from './Pawn';
 import { POINT_COORDINATES, ADJACENCY_LIST } from '@/lib/nine-pebbles-rules';
-import Snake from './Snake';
+import Dragon from './Dragon'; // Changed from Snake to Dragon
 
 interface GameBoardDisplayProps {
   board: GameBoardArray;
@@ -13,7 +13,7 @@ interface GameBoardDisplayProps {
   selectedPawnIndex: number | null;
   gamePhase: string; 
   currentPlayer: Player;
-  winner: Player | null; // Added winner prop
+  winner: Player | null;
 }
 
 const boardPoints = POINT_COORDINATES.map(p => ({
@@ -45,56 +45,50 @@ const linesDef = [
   { x1: boardPoints[7].cx, y1: boardPoints[7].cy, x2: boardPoints[23].cx, y2: boardPoints[23].cy },
 ];
 
-// Helper to find *any* valid empty spot for the snake, prioritizing current if valid.
-function getSafeSnakeSpot(
-  currentSnakeIdx: number | null,
+// Helper to find *any* valid empty spot for the dragon, prioritizing current if valid.
+function getSafeDragonSpot(
+  currentDragonIdx: number | null,
   board: GameBoardArray
 ): number | null {
   const openSpots = board.map((p, i) => (p === null ? i : -1)).filter(i => i !== -1);
   if (openSpots.length === 0) return null;
 
-  if (currentSnakeIdx !== null && board[currentSnakeIdx] === null) {
-    return currentSnakeIdx; // Current spot is safe and empty
+  if (currentDragonIdx !== null && board[currentDragonIdx] === null) {
+    return currentDragonIdx; // Current spot is safe and empty
   }
   // Current spot is unsafe or null, pick any other open spot
   const randomIndex = Math.floor(Math.random() * openSpots.length);
   return openSpots[randomIndex];
 }
 
-// Helper to find the NEAREST *DIFFERENT* open spot for the snake to move to.
+// Helper to find the NEAREST *DIFFERENT* open spot for the dragon to move to.
 function findNearestNewTarget(
-  currentSnakeIdx: number, // Assumed to be a valid, empty spot
+  currentDragonIdx: number, // Assumed to be a valid, empty spot
   board: GameBoardArray,
   adjacencyList: number[][]
 ): number | null {
-  // BFS starting from currentSnakeIdx to find nearest different open spot
   const q: { point: number; dist: number }[] = [];
-  const visited = new Set<number>([currentSnakeIdx]); // Mark current as visited initially
+  const visited = new Set<number>([currentDragonIdx]); 
   
-  // Prime queue with direct neighbors
-  for (const neighbor of adjacencyList[currentSnakeIdx]) {
-    if (board[neighbor] === null) { // If neighbor is open
-        q.push({ point: neighbor, dist: 1 }); // Add to queue
+  for (const neighbor of adjacencyList[currentDragonIdx]) {
+    if (board[neighbor] === null) { 
+        q.push({ point: neighbor, dist: 1 }); 
     }
-    visited.add(neighbor); // Mark neighbor as visited to avoid re-processing at depth 1
+    visited.add(neighbor); 
   }
 
   const potentialTargets: {point: number, dist: number}[] = [];
 
-  let head = 0; // Pointer for queue to avoid excessive shift() calls
+  let head = 0; 
   while(head < q.length) {
-    const current = q[head++]; // Dequeue
+    const current = q[head++]; 
 
-    if (board[current.point] === null && current.point !== currentSnakeIdx) {
+    if (board[current.point] === null && current.point !== currentDragonIdx) {
       potentialTargets.push(current);
-      // Optimization: if we find any target, we can stop BFS for this level if we only want one.
-      // To find all targets at this minimum distance, continue processing all elements with current.dist
     }
     
-    // If we already have targets, and current item's distance is greater, stop.
     if(potentialTargets.length > 0 && current.dist > potentialTargets[0].dist) break;
 
-    // Add its unvisited neighbors
     for (const neighbor of adjacencyList[current.point]) {
       if (!visited.has(neighbor)) {
         visited.add(neighbor);
@@ -103,14 +97,14 @@ function findNearestNewTarget(
     }
   }
   
-  if (potentialTargets.length === 0) return null; // No different open spot found
+  if (potentialTargets.length === 0) return null; 
 
-  potentialTargets.sort((a,b) => { // Sort by distance, then by point index
+  potentialTargets.sort((a,b) => { 
       if(a.dist !== b.dist) return a.dist - b.dist;
       return a.point - b.point;
   });
   
-  return potentialTargets[0].point; // Return the "best" (nearest, then lowest index)
+  return potentialTargets[0].point; 
 }
 
 
@@ -125,77 +119,73 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   const pointRadius = 3; 
   const clickableRadius = 5; 
 
-  const [snakeCurrentBoardIndex, setSnakeCurrentBoardIndex] = useState<number | null>(null);
-  const [snakeTargetBoardIndex, setSnakeTargetBoardIndex] = useState<number | null>(null);
-  const [snakeIsMovingToNext, setSnakeIsMovingToNext] = useState(false);
-  const [snakeVisible, setSnakeVisible] = useState(false);
+  const [dragonCurrentBoardIndex, setDragonCurrentBoardIndex] = useState<number | null>(null);
+  const [dragonTargetBoardIndex, setDragonTargetBoardIndex] = useState<number | null>(null);
+  const [dragonIsMovingToNext, setDragonIsMovingToNext] = useState(false);
+  const [dragonVisible, setDragonVisible] = useState(false);
 
-  const SNAKE_ANIMATION_DURATION = 1200; // ms
-  const SNAKE_WAIT_DURATION = 2500; // ms
+  const DRAGON_ANIMATION_DURATION = 1500; // ms, slightly longer for more elaborate movement
+  const DRAGON_WAIT_DURATION = 3000; // ms
 
-  // Effect 1: Snake Placement/Correction
-  // Ensures snake is on a valid spot or hidden.
+  // Effect 1: Dragon Placement/Correction
   useEffect(() => {
     if (gamePhase === 'playerSelection' || winner !== null) {
-      setSnakeVisible(false);
+      setDragonVisible(false);
       return;
     }
-    if (snakeIsMovingToNext) return; // Don't interfere if snake is already in transit
+    if (dragonIsMovingToNext) return;
 
-    const safeSpot = getSafeSnakeSpot(snakeCurrentBoardIndex, board);
+    const safeSpot = getSafeDragonSpot(dragonCurrentBoardIndex, board);
 
     if (safeSpot !== null) {
-      if (snakeCurrentBoardIndex !== safeSpot) {
-        setSnakeCurrentBoardIndex(safeSpot); // Update current position if it changed
+      if (dragonCurrentBoardIndex !== safeSpot) {
+        setDragonCurrentBoardIndex(safeSpot); 
       }
-      setSnakeVisible(true);
+      setDragonVisible(true);
     } else {
-      setSnakeVisible(false); // No safe spot, hide snake
+      setDragonVisible(false); 
     }
-  }, [board, gamePhase, winner, snakeIsMovingToNext, snakeCurrentBoardIndex]);
+  }, [board, gamePhase, winner, dragonIsMovingToNext, dragonCurrentBoardIndex]);
 
 
-  // Effect 2: Snake Movement Cycle
-  // Manages the snake's decision to move and the animation timing.
+  // Effect 2: Dragon Movement Cycle
   useEffect(() => {
-    if (!snakeVisible || snakeCurrentBoardIndex === null || gamePhase === 'playerSelection' || winner !== null) {
-      return; // Snake is not active or game conditions prevent movement
+    if (!dragonVisible || dragonCurrentBoardIndex === null || gamePhase === 'playerSelection' || winner !== null) {
+      return; 
     }
 
     let waitTimer: NodeJS.Timeout;
     let animationEndTimer: NodeJS.Timeout;
 
-    if (!snakeIsMovingToNext) { // Snake is resting, decide next move
+    if (!dragonIsMovingToNext) { 
       waitTimer = setTimeout(() => {
-        const target = findNearestNewTarget(snakeCurrentBoardIndex, board, ADJACENCY_LIST);
-        if (target !== null) { // target is guaranteed to be different from snakeCurrentBoardIndex
-          setSnakeTargetBoardIndex(target);
-          setSnakeIsMovingToNext(true);
+        const target = findNearestNewTarget(dragonCurrentBoardIndex, board, ADJACENCY_LIST);
+        if (target !== null) { 
+          setDragonTargetBoardIndex(target);
+          setDragonIsMovingToNext(true);
         }
-        // Else: no valid new target, snake stays put, timeout will re-evaluate on next cycle.
-      }, SNAKE_WAIT_DURATION);
-    } else { // Snake is moving
-      if (snakeTargetBoardIndex === null) { // Should ideally not happen if isMoving is true
-        setSnakeIsMovingToNext(false); // Reset state
+      }, DRAGON_WAIT_DURATION);
+    } else { 
+      if (dragonTargetBoardIndex === null) { 
+        setDragonIsMovingToNext(false); 
         return;
       }
       animationEndTimer = setTimeout(() => {
-        setSnakeCurrentBoardIndex(snakeTargetBoardIndex); // Arrived at target
-        setSnakeTargetBoardIndex(null); // Clear target
-        setSnakeIsMovingToNext(false);  // Stop moving state
-      }, SNAKE_ANIMATION_DURATION);
+        setDragonCurrentBoardIndex(dragonTargetBoardIndex); 
+        setDragonTargetBoardIndex(null); 
+        setDragonIsMovingToNext(false);  
+      }, DRAGON_ANIMATION_DURATION);
     }
 
-    return () => { // Cleanup timers
+    return () => { 
       clearTimeout(waitTimer);
       clearTimeout(animationEndTimer);
     };
-  }, [snakeVisible, snakeCurrentBoardIndex, snakeIsMovingToNext, snakeTargetBoardIndex, board, gamePhase, winner, SNAKE_ANIMATION_DURATION, SNAKE_WAIT_DURATION]);
+  }, [dragonVisible, dragonCurrentBoardIndex, dragonIsMovingToNext, dragonTargetBoardIndex, board, gamePhase, winner, DRAGON_ANIMATION_DURATION, DRAGON_WAIT_DURATION]);
 
 
-  const currentSnakeCoords = snakeCurrentBoardIndex !== null ? boardPoints[snakeCurrentBoardIndex] : null;
-  // If target is not set yet (e.g. snake is waiting), use current for smooth transition start
-  const targetSnakeCoords = snakeTargetBoardIndex !== null ? boardPoints[snakeTargetBoardIndex] : currentSnakeCoords;
+  const currentDragonCoords = dragonCurrentBoardIndex !== null ? boardPoints[dragonCurrentBoardIndex] : null;
+  const targetDragonCoords = dragonTargetBoardIndex !== null ? boardPoints[dragonTargetBoardIndex] : currentDragonCoords;
 
 
   return (
@@ -213,13 +203,12 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
           />
         ))}
 
-        {/* Render Snake animation */}
-        {snakeVisible && currentSnakeCoords && targetSnakeCoords && (
-          <Snake
-            currentPos={{ x: currentSnakeCoords.cx, y: currentSnakeCoords.cy }}
-            targetPos={{ x: targetSnakeCoords.cx, y: targetSnakeCoords.cy }}
-            isMoving={snakeIsMovingToNext}
-            animationDuration={SNAKE_ANIMATION_DURATION}
+        {dragonVisible && currentDragonCoords && targetDragonCoords && (
+          <Dragon // Changed from Snake
+            currentPos={{ x: currentDragonCoords.cx, y: currentDragonCoords.cy }}
+            targetPos={{ x: targetDragonCoords.cx, y: targetDragonCoords.cy }}
+            isMoving={dragonIsMovingToNext}
+            animationDuration={DRAGON_ANIMATION_DURATION}
           />
         )}
 

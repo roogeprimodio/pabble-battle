@@ -60,8 +60,10 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
   useEffect(() => {
     if (isMoving && animationDuration > 0) {
       const turnSeverity = Math.min(1, Math.abs(turnDeltaAngleRef.current) / 90); 
-      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (1 + turnSeverity * 0.5); // Reduced effect of turn on amplitude
-      const dynamicMaxSegmentRotation = 20 + turnSeverity * 30; // Max segment S-wave rotation, more responsive to turns
+      // Reduced base amplitude and turn influence to reduce flicker
+      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (0.5 + turnSeverity * 0.15); 
+      // Reduced max segment rotation, especially the turn-based addition
+      const dynamicMaxSegmentRotation = 10 + turnSeverity * 10; 
 
       const animateWinding = (timestamp: number) => {
         if (startTimeRef.current === null) {
@@ -73,19 +75,18 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
 
         if (progress < 1) {
           const newSegmentStyles = segmentStyles.map((_, i) => {
-            // Head segment (i=0) transform is directly controlled by visualTransform, no local animation here.
             if (i === 0) return segmentStyles[0]; 
             
-            const amplitudeFactor = 1 + (i / segmentCount) * 0.6; 
+            const amplitudeFactor = 1 + (i / segmentCount) * 0.5; // Keep some variation along the body
             const movementPhaseAmplitudeFactor = Math.sin(progress * Math.PI); 
             
-            // Dampen S-wave during sharp turns to emphasize bend
-            const sWaveDampening = 1 - (turnSeverity * 0.6); // Dampen up to 60% for 90deg+ turns
+            const sWaveDampening = 1 - (turnSeverity * 0.7); // Slightly increased dampening during turns
 
             const currentAmplitude = dynamicWindingAmplitudeBase * amplitudeFactor * movementPhaseAmplitudeFactor * sWaveDampening;
             
             const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.8; 
-            const waveAngle = 2.5 * easedProgress * 2 * Math.PI; 
+            // Reduced wave frequency to make S-wave slower
+            const waveAngle = 1.5 * easedProgress * 2 * Math.PI;  
             
             const offsetY = currentAmplitude * Math.sin(waveAngle + phaseShift);
             
@@ -94,26 +95,22 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
 
             let segmentOverallBendRotation = 0;
             if (Math.abs(turnDeltaAngleRef.current) > 1) { 
-              const bendInfluenceFactor = (1 - Math.pow(i / (segmentCount + 1), 0.5)); // Closer to head = more influence, less linear falloff
-              // Increased factor from 0.25 to 0.50 for stronger bend
+              const bendInfluenceFactor = (1 - Math.pow(i / (segmentCount + 1), 0.5));
               segmentOverallBendRotation = (turnDeltaAngleRef.current * bendInfluenceFactor * 0.50) * Math.sin(progress * Math.PI);
             }
             
             const finalSegmentRotation = baseSegmentWaveRotation + segmentOverallBendRotation;
 
-            const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.06 * (i/segmentCount) * movementPhaseAmplitudeFactor;
+            const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.05 * (i/segmentCount) * movementPhaseAmplitudeFactor; // Reduced length variation
 
             return {
-              // ...segmentStyles[i], // Keep other properties like transformOrigin from initial setup if needed
               transform: `translateX(${-i * bodySegmentBaseLength * dynamicLengthFactor}px) translateY(${offsetY}px) rotate(${finalSegmentRotation}deg)`,
               transformOrigin: '100% 50%', 
-              // No CSS transition during rAF loop for direct control
             };
           });
           setSegmentStyles(newSegmentStyles);
           animationFrameIdRef.current = requestAnimationFrame(animateWinding);
         } else { 
-          // Animation finished, reset segments to a neutral straight position relative to the head
           const finalStyles = Array(segmentCount).fill({}).map((_,idx) => ({
               transform: `translateX(${-idx * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`,
               transformOrigin: '100% 50%',
@@ -125,7 +122,6 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       };
       animationFrameIdRef.current = requestAnimationFrame(animateWinding);
     } else if (!isMoving) { 
-        // When not moving, ensure segments are straight (relative to head)
          const finalStyles = Array(segmentCount).fill({}).map((_,idx) => ({
             transform: `translateX(${-idx * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`,
             transformOrigin: '100% 50%',
@@ -144,6 +140,8 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       }
       startTimeRef.current = null;
     };
+  // Removed segmentStyles from dependencies to prevent potential re-triggering issues with rAF loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMoving, animationDuration, bodySegmentBaseWidth, bodySegmentBaseLength, segmentCount]);
 
 

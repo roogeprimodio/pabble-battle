@@ -45,6 +45,7 @@ const linesDef = [
   { x1: boardPoints[7].cx, y1: boardPoints[7].cy, x2: boardPoints[23].cx, y2: boardPoints[23].cy },
 ];
 
+const cornerPointIds = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
 
 const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   board,
@@ -69,10 +70,27 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             <stop offset="100%" stopColor="hsl(var(--primary) / 0)" />
           </radialGradient>
           <radialGradient id="demonicGlow" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
-            <stop offset="0%" stopColor="hsl(var(--accent) / 0.1)" />
-            <stop offset="60%" stopColor="hsl(var(--accent) / 0.05)" />
-            <stop offset="100%" stopColor="hsl(var(--accent) / 0)" />
+            <stop offset="0%" stopColor="hsl(var(--destructive) / 0.1)" /> {/* Changed from accent to destructive */}
+            <stop offset="60%" stopColor="hsl(var(--destructive) / 0.05)" /> {/* Changed from accent to destructive */}
+            <stop offset="100%" stopColor="hsl(var(--destructive) / 0)" /> {/* Changed from accent to destructive */}
           </radialGradient>
+           <filter id="holyShine" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur" />
+            <feSpecularLighting in="blur" surfaceScale="5" specularConstant=".75" specularExponent="20" lightingColor="hsl(var(--primary))" result="specOut">
+              <fePointLight x="-5000" y="-10000" z="20000" />
+            </feSpecularLighting>
+            <feComposite in="specOut" in2="SourceAlpha" operator="in" result="specOut" />
+            <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
+          </filter>
+          <filter id="hellfireGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur" />
+            <feFlood floodColor="hsl(var(--destructive))" floodOpacity="0.7" result="flood" />
+            <feComposite in="flood" in2="blur" operator="in" result="colorBlur"/>
+            <feMerge>
+              <feMergeNode in="colorBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
         {currentPlayer === 1 && !winner && <rect width="100" height="100" fill="url(#angelicGlow)" className="transition-opacity duration-500" />}
         {currentPlayer === 2 && !winner && <rect width="100" height="100" fill="url(#demonicGlow)" className="transition-opacity duration-500" />}
@@ -114,10 +132,15 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             pointInteractionClass = "cursor-pointer";
             const opponent = currentPlayer === 1 ? 2 : 1;
             if (playerAtPoint === opponent && canRemovePawn(board, point.id, opponent)) {
-              highlightForRemovable = currentPlayer; // Current player is the one who can remove
+              highlightForRemovable = currentPlayer; 
             }
           }
           
+          const isCorner = cornerPointIds.includes(point.id);
+          const numberClassName = isCorner
+            ? "fill-accent dark:fill-accent font-bold" // Highlighted class for corners
+            : "fill-muted-foreground/70 dark:fill-muted-foreground/50"; // Default class
+
           return (
             <g key={`point-group-${point.id}`} onClick={() => onPointClick(point.id)} className={`group ${pointInteractionClass}`}>
               <circle 
@@ -133,9 +156,9 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                   cy={point.cy} 
                   radius={pointRadius} 
                   isSelected={isCurrentlySelectedPawn && playerAtPoint === currentPlayer}
-                  isBeingRemoved={pawnToRemoveIndex === point.id && gamePhase === 'animatingRemoval'} // For final removal animation
-                  removalPlayer={pawnToRemoveIndex === point.id ? currentPlayer : null} // Who is doing the final removal
-                  highlightAsRemovableCandidateForPlayer={highlightForRemovable} // For candidate highlight
+                  isBeingRemoved={pawnToRemoveIndex === point.id && gamePhase === 'animatingRemoval'} 
+                  removalPlayer={pawnToRemoveIndex === point.id ? currentPlayer : null} 
+                  highlightAsRemovableCandidateForPlayer={highlightForRemovable}
                 />
               ) : ( 
                 <>
@@ -145,17 +168,6 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                     r={pointRadius * 0.65} 
                     className={pointMarkerClass}
                   />
-                  <text
-                    x={point.cx}
-                    y={point.cy}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize="2" // Adjust font size as needed
-                    className="fill-muted-foreground select-none pointer-events-none"
-                    style={{ userSelect: 'none' }} // Ensure text is not selectable
-                  >
-                    {point.id}
-                  </text>
                 </>
               )}
                {gamePhase === 'movement' && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id) && !board[point.id] && (
@@ -165,19 +177,19 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                         r={pointRadius * 0.9} 
                         fill="transparent"
                         strokeDasharray="0.6 0.6" 
-                        className={`pointer-events-none animate-pulse ${currentPlayer === 1 ? 'stroke-primary/70' : 'stroke-accent/70'}`}
+                        className={`pointer-events-none animate-pulse ${currentPlayer === 1 ? 'stroke-primary/70' : 'stroke-destructive/70'}`} // Changed from accent to destructive
                         strokeWidth="0.6"
                     />
                 )}
                 {!playerAtPoint && (
                   <text
                     x={point.cx}
-                    y={point.cy + pointRadius + 2.5} // Position number below the point
+                    y={point.cy + pointRadius + 2.5} 
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fontSize="1.8" // Adjust font size as needed
-                    className="fill-muted-foreground/70 select-none pointer-events-none font-mono"
-                    style={{ userSelect: 'none' }} // Ensure text is not selectable
+                    fontSize={isCorner ? "2.2" : "1.8"} 
+                    className={`${numberClassName} select-none pointer-events-none font-mono`}
+                    style={{ userSelect: 'none' }} 
                   >
                     {point.id}
                   </text>
@@ -191,3 +203,5 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
 };
 
 export default GameBoardDisplay;
+
+    

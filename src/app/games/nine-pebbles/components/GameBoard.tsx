@@ -1,8 +1,9 @@
+// src/app/games/nine-pebbles/components/GameBoard.tsx
 "use client";
 
 import React from 'react';
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
-import PlayerPawnDisplay from './Pawn'; // Renamed for clarity
+import PlayerPawnDisplay from './Pawn';
 import { POINT_COORDINATES, ADJACENCY_LIST } from '@/lib/nine-pebbles-rules';
 
 interface GameBoardDisplayProps {
@@ -70,7 +71,9 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
 
         {boardPoints.map((point) => {
           const playerAtPoint = board[point.id];
-          const isSelected = selectedPawnIndex === point.id;
+          // isSelected here refers to the board point/pawn index being the selected one for movement.
+          // The PlayerPawnDisplay component will use this to apply its own glow.
+          const isCurrentlySelectedPawn = selectedPawnIndex === point.id;
           
           let pointInteractionClass = "cursor-default";
           let hoverEffectClass = "";
@@ -81,27 +84,33 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
           } else if (gamePhase === 'movement') {
             if (playerAtPoint === currentPlayer) { // Can select own pawn
               pointInteractionClass = "cursor-pointer";
-              hoverEffectClass = "group-hover:opacity-70";
+              // Hover effect for selectable pawn is now mostly on the pawn itself via PlayerPawnDisplay
             } else if (!playerAtPoint && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id)) { // Can move to adjacent empty
               pointInteractionClass = "cursor-pointer";
               hoverEffectClass = "hover:fill-primary/50 dark:hover:fill-primary/70";
             }
           } else if (gamePhase === 'removing' && playerAtPoint && playerAtPoint !== currentPlayer) {
             pointInteractionClass = "cursor-pointer";
-            hoverEffectClass = "hover:opacity-50 hover:fill-destructive/70";
+            // Hover effect for removable pawn will be on the pawn itself (e.g., slight dimming or color change if implemented in PlayerPawnDisplay)
           }
           
           return (
             <g key={`point-group-${point.id}`} onClick={() => onPointClick(point.id)} className={`group ${pointInteractionClass}`}>
-              <circle
+              <circle // Clickable area
                 cx={point.cx}
                 cy={point.cy}
                 r={clickableRadius}
                 fill="transparent"
               />
               {playerAtPoint ? (
-                <PlayerPawnDisplay player={playerAtPoint} cx={point.cx} cy={point.cy} radius={pointRadius} isSelected={isSelected} />
-              ) : (
+                <PlayerPawnDisplay 
+                  player={playerAtPoint} 
+                  cx={point.cx} 
+                  cy={point.cy} 
+                  radius={pointRadius} 
+                  isSelected={isCurrentlySelectedPawn && playerAtPoint === currentPlayer} // Pass isSelected status
+                />
+              ) : ( // Empty point placeholder
                 <circle
                   cx={point.cx}
                   cy={point.cy}
@@ -109,18 +118,7 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                   className={`fill-foreground/20 dark:fill-foreground/30 transition-colors ${hoverEffectClass}`}
                 />
               )}
-               {isSelected && (
-                 <circle
-                    cx={point.cx}
-                    cy={point.cy}
-                    r={pointRadius + 1.5}
-                    fill="none"
-                    className="stroke-primary/70 dark:stroke-primary/90 animate-pulse"
-                    strokeWidth="0.5"
-                    strokeDasharray="1 1"
-                  />
-               )}
-                {/* Highlight potential move target */}
+               {/* Highlight potential move target */}
                 {gamePhase === 'movement' && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id) && !board[point.id] && (
                     <circle
                         cx={point.cx}
@@ -130,7 +128,7 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                         stroke="hsl(var(--primary))"
                         strokeWidth="0.5"
                         strokeDasharray="0.5 0.5"
-                        className="opacity-70 pointer-events-none"
+                        className="opacity-70 pointer-events-none animate-pulse" // Added pulse for potential moves
                     />
                 )}
             </g>
@@ -142,4 +140,3 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
 };
 
 export default GameBoardDisplay;
-

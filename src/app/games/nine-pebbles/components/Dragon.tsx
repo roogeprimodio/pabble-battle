@@ -29,25 +29,36 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
   
   const animationFrameIdRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const turnDeltaAngleRef = useRef<number>(0);
+
 
   useEffect(() => {
-    let angle = currentAngle;
+    let newCalculatedHeadAngle = currentAngle; 
     if (isMoving && (currentPos.x !== targetPos.x || currentPos.y !== targetPos.y)) {
       const dx = targetPos.x - currentPos.x;
       const dy = targetPos.y - currentPos.y;
-      angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      setVisualTransform(`translate(${targetPos.x}px, ${targetPos.y}px) rotate(${angle}deg)`);
-      setCurrentAngle(angle); 
+      newCalculatedHeadAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+      let delta = newCalculatedHeadAngle - currentAngle; // currentAngle here is the angle *before* this move
+      if (delta > 180) delta -= 360;
+      if (delta < -180) delta += 360;
+      turnDeltaAngleRef.current = delta;
+
+      setVisualTransform(`translate(${targetPos.x}px, ${targetPos.y}px) rotate(${newCalculatedHeadAngle}deg)`);
+      setCurrentAngle(newCalculatedHeadAngle); 
     } else {
-      setVisualTransform(`translate(${currentPos.x}px, ${currentPos.y}px) rotate(${angle}deg)`);
+      turnDeltaAngleRef.current = 0; 
+      setVisualTransform(`translate(${currentPos.x}px, ${currentPos.y}px) rotate(${currentAngle}deg)`);
     }
   }, [currentPos, targetPos, isMoving, currentAngle, animationDuration]);
 
 
   useEffect(() => {
     if (isMoving && animationDuration > 0) {
-      const windingAmplitudeBase = bodySegmentBaseWidth * 0.4; // Increased amplitude
-      const windingCycles = 2.5; 
+      const turnSeverity = Math.min(1, Math.abs(turnDeltaAngleRef.current) / 90); // 0 for straight, 1 for >=90deg turn
+      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (1 + turnSeverity * 0.75); // Increase amplitude for turns
+      const dynamicMaxSegmentRotation = 18 + turnSeverity * 22; // Max segment S-wave rotation up to 40deg for sharp turns
+
 
       const animateWinding = (timestamp: number) => {
         if (startTimeRef.current === null) {
@@ -55,52 +66,47 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
         }
         const elapsedTime = timestamp - startTimeRef.current;
         const progress = Math.min(elapsedTime / animationDuration, 1);
-        // Smoother ease-in-out for the wave progression itself
         const easedProgress = 0.5 - 0.5 * Math.cos(progress * Math.PI); 
 
         if (progress < 1) {
           const newSegmentStyles = segmentStyles.map((_, i) => {
-            if (i === 0) return segmentStyles[0]; // Head segment is controlled by main transform
+            if (i === 0) return segmentStyles[0]; 
             
-            const amplitudeFactor = 1 + (i / segmentCount) * 0.6; // Tail segments wind more
-            // Dampen amplitude at the very start/end of the movement for smoother transition from/to static
-            const movementPhaseAmplitudeFactor = Math.sin(progress * Math.PI); // 0 to 1 to 0 over the movement
-            const amplitude = windingAmplitudeBase * amplitudeFactor * movementPhaseAmplitudeFactor;
+            const amplitudeFactor = 1 + (i / segmentCount) * 0.6; 
+            const movementPhaseAmplitudeFactor = Math.sin(progress * Math.PI); 
+            const amplitude = dynamicWindingAmplitudeBase * amplitudeFactor * movementPhaseAmplitudeFactor;
             
-            const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.8; // Slightly increased phase shift for more ripple
-            const waveAngle = windingCycles * easedProgress * 2 * Math.PI;
+            const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.8; 
+            const waveAngle = 2.5 * easedProgress * 2 * Math.PI; // windingCycles = 2.5
             
             const offsetY = amplitude * Math.sin(waveAngle + phaseShift);
             
-            // Segment rotation for bending effect
             const segmentRotationFactor = (i / segmentCount); 
-            // Rotation peaks mid-wave and is dampened by overall movement phase
-            const segmentRotation = Math.cos(waveAngle + phaseShift + Math.PI/2) * 18 * segmentRotationFactor * movementPhaseAmplitudeFactor; // Increased max rotation to 18
+            const baseSegmentWaveRotation = Math.cos(waveAngle + phaseShift + Math.PI/2) * dynamicMaxSegmentRotation * segmentRotationFactor * movementPhaseAmplitudeFactor;
 
-            // Dynamic segment spacing for compression/extension
             const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.06 * (i/segmentCount) * movementPhaseAmplitudeFactor;
 
             return {
               ...segmentStyles[i],
-              transform: `translateX(${-i * bodySegmentBaseLength * dynamicLengthFactor}px) translateY(${offsetY}px) rotate(${segmentRotation}deg)`,
+              transform: `translateX(${-i * bodySegmentBaseLength * dynamicLengthFactor}px) translateY(${offsetY}px) rotate(${baseSegmentWaveRotation}deg)`,
               transformOrigin: '100% 50%', 
-              transition: `transform ${animationDuration * 0.15}ms cubic-bezier(0.33, 1, 0.68, 1)` // Slightly faster individual segment response
+              transition: `transform ${animationDuration * 0.15}ms cubic-bezier(0.33, 1, 0.68, 1)`
             };
           });
           setSegmentStyles(newSegmentStyles);
           animationFrameIdRef.current = requestAnimationFrame(animateWinding);
-        } else { // End of movement
+        } else { 
           const finalStyles = Array(segmentCount).fill({}).map((_,i) => ({
               transform: `translateX(${-i * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`,
               transformOrigin: '100% 50%',
-              transition: `transform ${animationDuration * 0.25}ms cubic-bezier(0.25, 0.1, 0.25, 1)` // Smoother transition to static
+              transition: `transform ${animationDuration * 0.25}ms cubic-bezier(0.25, 0.1, 0.25, 1)` 
           }));
           setSegmentStyles(finalStyles);
           startTimeRef.current = null;    
         }
       };
       animationFrameIdRef.current = requestAnimationFrame(animateWinding);
-    } else if (!isMoving) { // Snap to straight if not moving
+    } else if (!isMoving) { 
          const finalStyles = Array(segmentCount).fill({}).map((_,i) => ({
             transform: `translateX(${-i * bodySegmentBaseLength * 0.55}px) translateY(0px) rotate(0deg)`,
             transformOrigin: '100% 50%',
@@ -119,7 +125,7 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       }
       startTimeRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
   }, [isMoving, animationDuration, bodySegmentBaseWidth, bodySegmentBaseLength]);
 
 
@@ -190,7 +196,6 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
     <g
       style={{
         transform: visualTransform,
-         // Smoother head movement easing (EaseInOutCubic)
         transition: isMoving ? `transform ${animationDuration}ms cubic-bezier(0.65, 0, 0.35, 1)` : 'none', 
         transformOrigin: '0 0', 
         pointerEvents: 'none',

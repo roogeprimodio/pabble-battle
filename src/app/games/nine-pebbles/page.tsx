@@ -343,8 +343,8 @@ const NinePebblesPage: React.FC = () => {
           <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> 9-Pebbles <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
         </h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" aria-label="Reset Game" disabled>
-            <RotateCcw className="h-5 w-5" />
+          <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Reset Game" disabled>
+            <RotateCcw />
           </Button>
           <ThemeToggle />
         </div>
@@ -409,8 +409,8 @@ const NinePebblesPage: React.FC = () => {
           <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> 9-Pebbles <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
         </h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handleResetGame} aria-label="Reset Game">
-            <RotateCcw className="h-5 w-5" />
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleResetGame} aria-label="Reset Game">
+            <RotateCcw />
           </Button>
           <ThemeToggle />
         </div>

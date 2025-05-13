@@ -43,20 +43,22 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
           <g transform={`scale(${scaleFactor})`}>
             <circle cx="0" cy="0" r="2.9" className={player1ColorClasses} strokeWidth="0.15" />
             {/* Halo */}
-            <ellipse cx="0" cy="-3.7" rx="2.1" ry="0.9" className={`${player1DetailFill} opacity-90`} />
-            <ellipse cx="0" cy="-3.7" rx="1.4" ry="0.5" className={`${player1ColorClasses} opacity-70`} />
+            <ellipse cx="0" cy="-3.7" rx="2.1" ry="0.9" className={`${player1DetailFill} animate-halo-shimmer`} />
+            <ellipse cx="0" cy="-3.7" rx="1.4" ry="0.5" className={`${player1ColorClasses} opacity-70`} /> {/* Inner halo part, kept original opacity, no shimmer */}
             {/* Simple Wings */}
-            <path d="M -1.5 0.5 Q -4 -1.5 -2.2 -3.2 L 0 -1.2 Z" className={`${player1DetailFill} opacity-50`} />
-            <path d="M 1.5 0.5 Q 4 -1.5 2.2 -3.2 L 0 -1.2 Z" className={`${player1DetailFill} opacity-50`} />
+            <g className="animate-angel-wings-float">
+              <path d="M -1.5 0.5 Q -4 -1.5 -2.2 -3.2 L 0 -1.2 Z" className={`${player1DetailFill} opacity-50`} />
+              <path d="M 1.5 0.5 Q 4 -1.5 2.2 -3.2 L 0 -1.2 Z" className={`${player1DetailFill} opacity-50`} />
+            </g>
           </g>
         ) : ( // Demon design
           <g transform={`scale(${scaleFactor})`}>
             <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.15" />
             {/* Horns */}
-            <path d="M -1.2 -2.5 C -2 -4.2 0.3 -3.8 0.2 -2.7 L -0.5 -2.4 Z" className={`${player2DetailFill} opacity-90`} transform="rotate(-15 0 0)" />
-            <path d="M 1.2 -2.5 C 2 -4.2 -0.3 -3.8 -0.2 -2.7 L 0.5 -2.4 Z" className={`${player2DetailFill} opacity-90`} transform="rotate(15 0 0)" />
+            <path d="M -1.2 -2.5 C -2 -4.2 0.3 -3.8 0.2 -2.7 L -0.5 -2.4 Z" className={`${player2DetailFill} animate-demon-horns-opac`} transform="rotate(-15 0 0)" />
+            <path d="M 1.2 -2.5 C 2 -4.2 -0.3 -3.8 -0.2 -2.7 L 0.5 -2.4 Z" className={`${player2DetailFill} animate-demon-horns-opac`} transform="rotate(15 0 0)" style={{animationDelay: '0.15s'}} />
              {/* Pointy Tail element at bottom */}
-            <path d="M 0 3 Q 0.8 4.2 0 5 Q -0.8 4.2 0 3 Z" className={`${player2DetailFill} opacity-70`} />
+            <path d="M 0 3 Q 0.8 4.2 0 5 Q -0.8 4.2 0 3 Z" className={`${player2DetailFill} opacity-70 animate-demon-tail-flick`} style={{ transformOrigin: '0px 3px' }} />
           </g>
         )}
       </g>

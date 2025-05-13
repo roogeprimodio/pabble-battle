@@ -95,6 +95,25 @@ export default {
           '0%, 100%': { filter: 'drop-shadow(0 0 2px currentColor) drop-shadow(0 0 3px currentColor) opacity(0.7)' },
           '50%': { filter: 'drop-shadow(0 0 4px currentColor) drop-shadow(0 0 6px currentColor) opacity(1)' },
         },
+        'angel-wings-float': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-0.75px)' },
+        },
+        'demon-tail-flick': {
+          '0%, 100%': { transform: 'rotate(0deg)' },
+          '20%': { transform: 'rotate(-8deg)' },
+          '40%': { transform: 'rotate(5deg)' },
+          '60%': { transform: 'rotate(-3deg)' },
+          '80%': { transform: 'rotate(2deg)' },
+        },
+        'halo-shimmer': {
+          '0%, 100%': { opacity: '0.6' },
+          '50%': { opacity: '1' },
+        },
+        'demon-horns-opac': {
+          '0%, 100%': { opacity: '0.75' },
+          '50%': { opacity: '1' },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
@@ -102,6 +121,10 @@ export default {
         'pawn-appear': 'pawn-appear 0.3s ease-out forwards',
         'pawn-disappear': 'pawn-disappear 0.3s ease-out forwards',
         'subtle-glow': 'subtle-glow 2s infinite ease-in-out alternate',
+        'angel-wings-float': 'angel-wings-float 2.5s infinite ease-in-out',
+        'demon-tail-flick': 'demon-tail-flick 1.8s infinite ease-in-out',
+        'halo-shimmer': 'halo-shimmer 3s infinite ease-in-out',
+        'demon-horns-opac': 'demon-horns-opac 2.8s infinite ease-in-out alternate',
   		}
   	}
   },

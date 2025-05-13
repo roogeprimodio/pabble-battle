@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, RotateCcw, Info, Swords, Zap } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Info, Swords, Zap, ShieldQuestion } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import GameBoardDisplay from './components/GameBoard';
 import PlayerPawnDisplay from './components/Pawn';
@@ -22,12 +22,12 @@ import {
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-type GamePhase = 'placement' | 'movement' | 'removing' | 'gameOver';
+type GamePhase = 'playerSelection' | 'placement' | 'movement' | 'removing' | 'gameOver';
 
 const NinePebblesPage: React.FC = () => {
   const [board, setBoard] = useState<GameBoardArray>(createInitialBoard());
-  const [currentPlayer, setCurrentPlayer] = useState<Player>(1);
-  const [gamePhase, setGamePhase] = useState<GamePhase>('placement');
+  const [currentPlayer, setCurrentPlayer] = useState<Player>(1); // Default, will be set by selection
+  const [gamePhase, setGamePhase] = useState<GamePhase>('playerSelection');
   
   const [playerStats, setPlayerStats] = useState({
     1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false },
@@ -37,7 +37,7 @@ const NinePebblesPage: React.FC = () => {
   const [pawnsToPlaceThisAction, setPawnsToPlaceThisAction] = useState(0);
   const [selectedPawnIndex, setSelectedPawnIndex] = useState<number | null>(null);
   const [winner, setWinner] = useState<Player | null>(null);
-  const [message, setMessage] = useState<string>('');
+  const [message, setMessage] = useState<string>('Choose which side will make the first move.');
   const { toast } = useToast();
 
   const getPlayerThematicName = useCallback((player: Player | null) => {
@@ -47,7 +47,8 @@ const NinePebblesPage: React.FC = () => {
   }, []);
 
   const updateMessageAndPawnsToPlace = useCallback(() => {
-    if (winner) return;
+    if (winner || gamePhase === 'playerSelection') return;
+    
     const currentPlayerName = getPlayerThematicName(currentPlayer);
 
     if (gamePhase === 'placement') {
@@ -81,19 +82,21 @@ const NinePebblesPage: React.FC = () => {
 
   const handleResetGame = () => {
     setBoard(createInitialBoard());
-    setCurrentPlayer(1);
-    setGamePhase('placement');
+    // setCurrentPlayer(1); // Player will be set in 'playerSelection'
+    setGamePhase('playerSelection');
     setPlayerStats({
       1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false },
       2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasMadeFirstPlacement: false },
     });
     setSelectedPawnIndex(null);
     setWinner(null);
-    toast({ title: "Game Reset", description: "The eternal battle begins anew." });
+    setPawnsToPlaceThisAction(0);
+    setMessage('Choose which side will make the first move.');
+    toast({ title: "Game Reset", description: "The eternal battle begins anew. Choose your champion." });
   };
   
   const checkWinCondition = useCallback(() => {
-    if (gamePhase === 'gameOver' || gamePhase === 'placement') return false;
+    if (gamePhase === 'gameOver' || gamePhase === 'placement' || gamePhase === 'playerSelection') return false;
 
     const p1OnBoard = playerStats[1].pawnsOnBoard;
     const p2OnBoard = playerStats[2].pawnsOnBoard;
@@ -124,15 +127,26 @@ const NinePebblesPage: React.FC = () => {
   }, [board, playerStats, gamePhase, currentPlayer]);
 
   useEffect(() => {
-    if (!winner) {
+    if (!winner && gamePhase !== 'playerSelection') {
       const gameEnded = checkWinCondition();
       if(gameEnded) updateMessageAndPawnsToPlace();
     }
-  }, [board, winner, checkWinCondition, updateMessageAndPawnsToPlace]);
+  }, [board, winner, checkWinCondition, updateMessageAndPawnsToPlace, gamePhase]);
 
+  const handlePlayerSelect = (player: Player) => {
+    setCurrentPlayer(player);
+    setGamePhase('placement');
+    // playerStats are already reset correctly or are in initial state.
+    // The crucial part is setting currentPlayer, then updateMessageAndPawnsToPlace
+    // (triggered by useEffect) will set up the 2-pawn placement for this player.
+    toast({ 
+      title: "Battle Commences!", 
+      description: `${getPlayerThematicName(player)} will lead the charge. Place 2 pawns.` 
+    });
+  };
 
   const handlePointClick = (index: number) => {
-    if (winner || gamePhase === 'gameOver') return;
+    if (winner || gamePhase === 'gameOver' || gamePhase === 'playerSelection') return;
 
     let newBoard = [...board];
     let newPlayerStats = JSON.parse(JSON.stringify(playerStats)); 
@@ -156,7 +170,7 @@ const NinePebblesPage: React.FC = () => {
           if (justPlacedOne === 0) {
             if (!newPlayerStats[currentPlayer].hasMadeFirstPlacement) {
               newPlayerStats[currentPlayer].hasMadeFirstPlacement = true;
-              setPlayerStats(newPlayerStats);
+              // setPlayerStats(newPlayerStats); // This will be set when board/playerStats update generally
             }
             if (newPlayerStats[1].pawnsToPlace === 0 && newPlayerStats[2].pawnsToPlace === 0) {
               setGamePhase('movement');
@@ -167,7 +181,8 @@ const NinePebblesPage: React.FC = () => {
           }
         }
       } else if (pawnsToPlaceThisAction === 0) {
-        toast({ title: "Placement Phase Logic", description: "All pawns for this action placed.", variant: "default" });
+        // This case should ideally not be hit if UI updates correctly, but good for robustness
+        toast({ title: "Placement Complete", description: "All pawns for this action placed. Waiting for next turn.", variant: "default" });
       } else {
         toast({ title: "Invalid Placement", description: "This position is already occupied.", variant: "destructive" });
       }
@@ -221,6 +236,47 @@ const NinePebblesPage: React.FC = () => {
       }
     }
   };
+
+  if (gamePhase === 'playerSelection') {
+    return (
+      <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
+        <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
+            <Link href="/choose-game" passHref>
+              <Button variant="outline" size="icon" aria-label="Back to Choose Game">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <ThemeToggle />
+        </header>
+        <Card className="w-full max-w-md shadow-2xl text-center">
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex justify-center mb-3">
+                <ShieldQuestion className="w-16 h-16 text-primary" />
+            </div>
+            <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Choose Who Starts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base">The chosen side makes the first move and places 2 pawns.</p>
+            <Button 
+              onClick={() => handlePlayerSelect(1)} 
+              className="w-full text-base sm:text-lg py-2.5 sm:py-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg"
+            >
+              <PlayerPawnDisplay player={1} size="small" /> <span className="ml-2">Angels Start</span>
+            </Button>
+            <Button 
+              onClick={() => handlePlayerSelect(2)} 
+              className="w-full text-base sm:text-lg py-2.5 sm:py-3 bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg"
+            >
+              <PlayerPawnDisplay player={2} size="small" /> <span className="ml-2">Demons Start</span>
+            </Button>
+          </CardContent>
+        </Card>
+        <footer className="text-center py-4 mt-6 text-sm text-muted-foreground">
+            <p>&copy; {new Date().getFullYear()} Pebble Arena</p>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
@@ -291,6 +347,11 @@ const NinePebblesPage: React.FC = () => {
                 Fight Again
               </Button>
             )}
+             {!winner && gamePhase !== 'playerSelection' && (
+                <Button onClick={handleResetGame} variant="outline" className="w-full mt-3 text-xs sm:text-sm py-1.5 sm:py-2">
+                    Restart Battle
+                </Button>
+            )}
           </CardContent>
         </Card>
       </main>
@@ -299,5 +360,3 @@ const NinePebblesPage: React.FC = () => {
 };
 
 export default NinePebblesPage;
-
-    

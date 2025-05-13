@@ -92,27 +92,43 @@ export default {
           '100%': { opacity: '0', transform: 'scale(0.5)' },
         },
         'subtle-glow': {
-          '0%, 100%': { filter: 'drop-shadow(0 0 2px currentColor) drop-shadow(0 0 3px currentColor) opacity(0.7)' },
-          '50%': { filter: 'drop-shadow(0 0 4px currentColor) drop-shadow(0 0 6px currentColor) opacity(1)' },
+          '0%, 100%': { filter: 'drop-shadow(0 0 1.5px currentColor) drop-shadow(0 0 2.5px currentColor) opacity(0.6)' },
+          '50%': { filter: 'drop-shadow(0 0 3px currentColor) drop-shadow(0 0 5px currentColor) opacity(0.9)' },
         },
-        'angel-wings-float': {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-0.75px)' },
+        'halo-pulse': { // Renamed from halo-shimmer for clarity
+          '0%, 100%': { opacity: '0.7', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.05)' },
         },
-        'demon-tail-flick': {
-          '0%, 100%': { transform: 'rotate(0deg)' },
-          '20%': { transform: 'rotate(-8deg)' },
-          '40%': { transform: 'rotate(5deg)' },
-          '60%': { transform: 'rotate(-3deg)' },
-          '80%': { transform: 'rotate(2deg)' },
+        'angel-wings-gentle-flap': { // Renamed for clarity
+          '0%, 100%': { transform: 'translateY(0px) scaleY(1)' },
+          '50%': { transform: 'translateY(-0.5px) scaleY(1.05)' },
         },
-        'halo-shimmer': {
-          '0%, 100%': { opacity: '0.6' },
-          '50%': { opacity: '1' },
+        'demon-horns-glow': { // Renamed from demon-horns-opac
+          '0%, 100%': { opacity: '0.8', filter: 'brightness(1)' },
+          '50%': { opacity: '1', filter: 'brightness(1.2)' },
         },
-        'demon-horns-opac': {
-          '0%, 100%': { opacity: '0.75' },
-          '50%': { opacity: '1' },
+        'demon-wings-twitch': {
+          '0%, 100%': { transform: 'scaleY(1) rotate(0deg)' },
+          '20%': { transform: 'scaleY(0.95) rotate(2deg)' },
+          '40%': { transform: 'scaleY(1.02) rotate(-1deg)' },
+          '60%': { transform: 'scaleY(0.98) rotate(1deg)' },
+          '80%': { transform: 'scaleY(1) rotate(0deg)' },
+        },
+        'demon-tail-whip': { // Renamed from demon-tail-flick
+          '0%, 100%': { transform: 'rotate(0deg) translateX(0)' },
+          '25%': { transform: 'rotate(-12deg) translateX(0.2px)' },
+          '50%': { transform: 'rotate(8deg) translateX(-0.1px)' },
+          '75%': { transform: 'rotate(-5deg) translateX(0.1px)' },
+        },
+        'holy-dispel': { // For angel pawn being removed by demon
+          '0%': { opacity: '1', filter: 'brightness(1) drop-shadow(0 0 3px hsl(var(--primary)))' },
+          '50%': { opacity: '0.7', filter: 'brightness(1.5) drop-shadow(0 0 8px hsl(var(--primary)))', transform: 'scale(1.1)' },
+          '100%': { opacity: '0', filter: 'brightness(2) drop-shadow(0 0 15px hsl(var(--primary)))', transform: 'scale(0.5)' },
+        },
+        'hellish-banish': { // For demon pawn being removed by angel
+          '0%': { opacity: '1', filter: 'brightness(1) drop-shadow(0 0 3px hsl(var(--accent)))' },
+          '50%': { opacity: '0.7', filter: 'brightness(1.5) drop-shadow(0 0 8px hsl(var(--accent)))', transform: 'scale(1.1) rotate(5deg)' },
+          '100%': { opacity: '0', filter: 'brightness(2) drop-shadow(0 0 15px hsl(var(--accent)))', transform: 'scale(0.5) rotate(-10deg)' },
         },
   		},
   		animation: {
@@ -120,11 +136,14 @@ export default {
   			'accordion-up': 'accordion-up 0.2s ease-out',
         'pawn-appear': 'pawn-appear 0.3s ease-out forwards',
         'pawn-disappear': 'pawn-disappear 0.3s ease-out forwards',
-        'subtle-glow': 'subtle-glow 2s infinite ease-in-out alternate',
-        'angel-wings-float': 'angel-wings-float 2.5s infinite ease-in-out',
-        'demon-tail-flick': 'demon-tail-flick 1.8s infinite ease-in-out',
-        'halo-shimmer': 'halo-shimmer 3s infinite ease-in-out',
-        'demon-horns-opac': 'demon-horns-opac 2.8s infinite ease-in-out alternate',
+        'subtle-glow': 'subtle-glow 2.2s infinite ease-in-out alternate',
+        'halo-pulse': 'halo-pulse 2.8s infinite ease-in-out',
+        'angel-wings-gentle-flap': 'angel-wings-gentle-flap 3s infinite ease-in-out',
+        'demon-horns-glow': 'demon-horns-glow 2.5s infinite ease-in-out alternate',
+        'demon-wings-twitch': 'demon-wings-twitch 2s infinite ease-in-out',
+        'demon-tail-whip': 'demon-tail-whip 1.6s infinite ease-in-out',
+        'holy-dispel': 'holy-dispel 0.7s ease-out forwards',
+        'hellish-banish': 'hellish-banish 0.7s ease-out forwards',
   		}
   	}
   },

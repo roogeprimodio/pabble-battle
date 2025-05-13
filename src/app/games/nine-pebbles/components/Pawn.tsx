@@ -11,6 +11,8 @@ interface PlayerPawnDisplayProps {
   radius?: number;
   isSelected?: boolean;
   size?: 'small' | 'normal';
+  isBeingRemoved?: boolean; // For holy/hellish removal animation
+  removalPlayer?: Player | null; // To determine which animation to play
 }
 
 const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
@@ -20,45 +22,68 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
   radius = 3,
   isSelected,
   size = 'normal',
+  isBeingRemoved = false,
+  removalPlayer = null,
 }) => {
   const displayRadius = size === 'small' ? 2.5 : radius;
   const scaleFactor = displayRadius / 3; // Original design details were based on radius ~3
 
   const player1ColorClasses = "fill-primary stroke-primary-foreground/50 dark:stroke-black/40";
-  const player1DetailFill = "fill-primary-foreground";
+  const player1DetailFill = "fill-primary-foreground/90"; // Slightly more opaque
   
   const player2ColorClasses = "fill-accent stroke-accent-foreground/50 dark:stroke-black/40";
-  const player2DetailFill = "fill-accent-foreground";
+  const player2DetailFill = "fill-accent-foreground/90"; // Slightly more opaque
 
   const commonPawnClasses = "transition-all duration-150 ease-in-out";
-  // The drop-shadow for subtle-glow uses currentColor, set by text-primary/text-accent
   const selectionGlowClass = isSelected 
     ? (player === 1 ? "animate-subtle-glow text-primary" : "animate-subtle-glow text-accent") 
     : "";
 
+  let removalAnimationClass = "";
+  if (isBeingRemoved) {
+    if (removalPlayer === 1) { // Angel removing a demon pawn
+      removalAnimationClass = player === 2 ? "animate-hellish-banish" : "";
+    } else if (removalPlayer === 2) { // Demon removing an angel pawn
+      removalAnimationClass = player === 1 ? "animate-holy-dispel" : "";
+    }
+  }
+
   if (cx !== undefined && cy !== undefined) { // SVG rendering for game board
     return (
-      <g transform={`translate(${cx}, ${cy})`} className={`${commonPawnClasses} ${selectionGlowClass}`}>
+      <g transform={`translate(${cx}, ${cy})`} className={`${commonPawnClasses} ${selectionGlowClass} ${removalAnimationClass}`}>
         {player === 1 ? ( // Angel design
           <g transform={`scale(${scaleFactor})`}>
-            <circle cx="0" cy="0" r="2.9" className={player1ColorClasses} strokeWidth="0.15" />
-            {/* Halo */}
-            <ellipse cx="0" cy="-3.7" rx="2.1" ry="0.9" className={`${player1DetailFill} animate-halo-shimmer`} />
-            <ellipse cx="0" cy="-3.7" rx="1.4" ry="0.5" className={`${player1ColorClasses} opacity-70`} /> {/* Inner halo part, kept original opacity, no shimmer */}
-            {/* Simple Wings */}
-            <g className="animate-angel-wings-float">
-              <path d="M -1.5 0.5 Q -4 -1.5 -2.2 -3.2 L 0 -1.2 Z" className={`${player1DetailFill} opacity-50`} />
-              <path d="M 1.5 0.5 Q 4 -1.5 2.2 -3.2 L 0 -1.2 Z" className={`${player1DetailFill} opacity-50`} />
+            <circle cx="0" cy="0" r="2.9" className={player1ColorClasses} strokeWidth="0.2" />
+            {/* Halo - Brighter and more defined */}
+            <ellipse cx="0" cy="-3.9" rx="2.3" ry="1.0" className={`${player1DetailFill} opacity-90 animate-halo-pulse`} />
+            <ellipse cx="0" cy="-3.9" rx="1.6" ry="0.6" className={`${player1ColorClasses} opacity-60`} />
+            {/* More Detailed Wings - with feather-like strokes */}
+            <g className="animate-angel-wings-gentle-flap">
+              {/* Left Wing */}
+              <path d="M -1.2 0.8 Q -4.5 -1.0 -2.5 -3.5 L 0 -1.5 Z" className={`${player1DetailFill} opacity-70`} />
+              <path d="M -1.4 0.6 Q -3.8 -0.5 -2.8 -2.5 L -0.2 -1.2 Z" className={`${player1ColorClasses} opacity-40`} /> 
+              {/* Right Wing */}
+              <path d="M 1.2 0.8 Q 4.5 -1.0 2.5 -3.5 L 0 -1.5 Z" className={`${player1DetailFill} opacity-70`} />
+              <path d="M 1.4 0.6 Q 3.8 -0.5 2.8 -2.5 L 0.2 -1.2 Z" className={`${player1ColorClasses} opacity-40`} />
             </g>
+            {/* Subtle body hint */}
+            <path d="M -0.8 2.5 Q 0 1.5 0.8 2.5 L 0 2.8 Z" className={`${player1DetailFill} opacity-30`} />
           </g>
         ) : ( // Demon design
           <g transform={`scale(${scaleFactor})`}>
-            <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.15" />
-            {/* Horns */}
-            <path d="M -1.2 -2.5 C -2 -4.2 0.3 -3.8 0.2 -2.7 L -0.5 -2.4 Z" className={`${player2DetailFill} animate-demon-horns-opac`} transform="rotate(-15 0 0)" />
-            <path d="M 1.2 -2.5 C 2 -4.2 -0.3 -3.8 -0.2 -2.7 L 0.5 -2.4 Z" className={`${player2DetailFill} animate-demon-horns-opac`} transform="rotate(15 0 0)" style={{animationDelay: '0.15s'}} />
-             {/* Pointy Tail element at bottom */}
-            <path d="M 0 3 Q 0.8 4.2 0 5 Q -0.8 4.2 0 3 Z" className={`${player2DetailFill} opacity-70 animate-demon-tail-flick`} style={{ transformOrigin: '0px 3px' }} />
+            <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.2" />
+            {/* Sharper Horns - with a subtle glow/pulse */}
+            <g className="animate-demon-horns-glow">
+              <path d="M -1.0 -2.6 C -1.8 -4.5 0.5 -4.0 0.3 -2.8 L -0.6 -2.5 Z" className={`${player2DetailFill}`} transform="rotate(-20 0 0)" />
+              <path d="M 1.0 -2.6 C 1.8 -4.5 -0.5 -4.0 -0.3 -2.8 L 0.6 -2.5 Z" className={`${player2DetailFill}`} transform="rotate(20 0 0)" />
+            </g>
+            {/* Small Bat-like Wings */}
+            <g className="animate-demon-wings-twitch">
+                <path d="M -1.5 0 C -3.5 -1.5 -2.5 -2.8 -1.0 -2.0 Z" className={`${player2DetailFill} opacity-60`} transform="rotate(10 -1 0)"/>
+                <path d="M 1.5 0 C 3.5 -1.5 2.5 -2.8 1.0 -2.0 Z" className={`${player2DetailFill} opacity-60`} transform="rotate(-10 1 0)"/>
+            </g>
+            {/* More Dynamic Pointy Tail */}
+            <path d="M 0 2.8 Q 1.2 4.5 0 5.3 Q -1.2 4.5 0 2.8 Z" className={`${player2DetailFill} opacity-80 animate-demon-tail-whip`} style={{ transformOrigin: '0px 2.8px' }} />
           </g>
         )}
       </g>
@@ -66,25 +91,28 @@ const PlayerPawnDisplay: React.FC<PlayerPawnDisplayProps> = ({
   }
 
   // Div rendering for status panel
-  const statusPawnSizeClass = size === 'small' ? 'w-7 h-7' : 'w-9 h-9'; // Slightly larger for SVG details
-  // Adjusted scale for status display; ensure details are visible but not overly large
-  const statusScaleFactor = (size === 'small' ? 1.8 : 2.2) / 3.0; 
+  const statusPawnSizeClass = size === 'small' ? 'w-7 h-7' : 'w-9 h-9';
+  const statusScaleFactor = (size === 'small' ? 1.9 : 2.3) / 3.0; 
 
   return (
     <div className={`${statusPawnSizeClass} rounded-full shadow-sm flex items-center justify-center ${isSelected ? (player === 1 ? 'ring-2 ring-offset-1 ring-primary' : 'ring-2 ring-offset-1 ring-accent') : ''}`}>
-      {/* Adjusted viewBox for better fit of details in status panel */}
-      <svg viewBox="-4 -5 8 10" className="w-full h-full overflow-visible"> 
-        {player === 1 ? ( // Angel
+      <svg viewBox="-4.5 -5.5 9 11" className="w-full h-full overflow-visible"> 
+        {player === 1 ? ( // Angel (Simplified for status)
           <g transform={`scale(${statusScaleFactor})`}>
-            <circle cx="0" cy="0" r="2.9" className={player1ColorClasses} strokeWidth="0.25"/>
-            <ellipse cx="0" cy="-3.7" rx="2.1" ry="0.9" className={`${player1DetailFill} opacity-90`} />
-            <ellipse cx="0" cy="-3.7" rx="1.4" ry="0.5" className={`${player1ColorClasses} opacity-70`} />
+            <circle cx="0" cy="0" r="2.9" className={player1ColorClasses} strokeWidth="0.3"/>
+            <ellipse cx="0" cy="-3.9" rx="2.3" ry="1.0" className={`${player1DetailFill} opacity-80`} />
+             {/* Simplified Wings for status */}
+            <path d="M -1.2 0.8 Q -4.0 -0.8 -2.2 -3.0 L 0 -1.5 Z" className={`${player1DetailFill} opacity-60`} />
+            <path d="M 1.2 0.8 Q 4.0 -0.8 2.2 -3.0 L 0 -1.5 Z" className={`${player1DetailFill} opacity-60`} />
           </g>
-        ) : ( // Demon
+        ) : ( // Demon (Simplified for status)
           <g transform={`scale(${statusScaleFactor})`}>
-            <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.25"/>
-            <path d="M -1.2 -2.5 C -2 -4.2 0.3 -3.8 0.2 -2.7 L -0.5 -2.4 Z" className={`${player2DetailFill} opacity-90`} transform="rotate(-15 0 0)" />
-            <path d="M 1.2 -2.5 C 2 -4.2 -0.3 -3.8 -0.2 -2.7 L 0.5 -2.4 Z" className={`${player2DetailFill} opacity-90`} transform="rotate(15 0 0)" />
+            <circle cx="0" cy="0" r="2.9" className={player2ColorClasses} strokeWidth="0.3"/>
+             {/* Simplified Horns for status */}
+            <path d="M -1.0 -2.6 C -1.8 -4.2 0.4 -3.9 0.3 -2.8 Z" className={`${player2DetailFill} opacity-80`} transform="rotate(-20 0 0)" />
+            <path d="M 1.0 -2.6 C 1.8 -4.2 -0.4 -3.9 -0.3 -2.8 Z" className={`${player2DetailFill} opacity-80`} transform="rotate(20 0 0)" />
+             {/* Simplified Tail for status */}
+            <path d="M 0 2.8 Q 0.9 4.0 0 4.6 Q -0.9 4.0 0 2.8 Z" className={`${player2DetailFill} opacity-70`} />
           </g>
         )}
       </svg>

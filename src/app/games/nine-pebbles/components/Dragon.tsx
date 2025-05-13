@@ -39,17 +39,16 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       const dy = targetPos.y - currentPos.y;
       const targetHeadAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-      let delta = targetHeadAngle - currentAngle; // currentAngle is from previous rest state
+      let delta = targetHeadAngle - currentAngle; 
       if (delta > 180) delta -= 360;
       if (delta < -180) delta += 360;
       turnDeltaAngleRef.current = delta;
 
       setVisualTransform(`translate(${targetPos.x}px, ${targetPos.y}px) rotate(${targetHeadAngle}deg)`);
-      setCurrentAngle(targetHeadAngle); // Update currentAngle to the target for this move
+      setCurrentAngle(targetHeadAngle); 
 
     } else { 
       turnDeltaAngleRef.current = 0;
-      // If not moving, ensure visual transform reflects the settled state
       if (!isMoving) {
           setVisualTransform(`translate(${currentPos.x}px, ${currentPos.y}px) rotate(${currentAngle}deg)`);
       }
@@ -60,9 +59,9 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
   // Effect 2: Animate body segments winding and bending based on movement and turn delta.
   useEffect(() => {
     if (isMoving && animationDuration > 0) {
-      const turnSeverity = Math.min(1, Math.abs(turnDeltaAngleRef.current) / 90); // 0 for straight, 1 for >=90deg turn
-      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (1 + turnSeverity * 0.75); 
-      const dynamicMaxSegmentRotation = 18 + turnSeverity * 22; // Max segment S-wave rotation
+      const turnSeverity = Math.min(1, Math.abs(turnDeltaAngleRef.current) / 90); 
+      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (1 + turnSeverity * 0.5); // Reduced effect of turn on amplitude
+      const dynamicMaxSegmentRotation = 20 + turnSeverity * 30; // Max segment S-wave rotation, more responsive to turns
 
       const animateWinding = (timestamp: number) => {
         if (startTimeRef.current === null) {
@@ -74,25 +73,30 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
 
         if (progress < 1) {
           const newSegmentStyles = segmentStyles.map((_, i) => {
-            if (i === 0) return segmentStyles[0]; // Head segment is implicitly handled by the main visualTransform
+            // Head segment (i=0) transform is directly controlled by visualTransform, no local animation here.
+            if (i === 0) return segmentStyles[0]; 
             
             const amplitudeFactor = 1 + (i / segmentCount) * 0.6; 
             const movementPhaseAmplitudeFactor = Math.sin(progress * Math.PI); 
-            const amplitude = dynamicWindingAmplitudeBase * amplitudeFactor * movementPhaseAmplitudeFactor;
+            
+            // Dampen S-wave during sharp turns to emphasize bend
+            const sWaveDampening = 1 - (turnSeverity * 0.6); // Dampen up to 60% for 90deg+ turns
+
+            const currentAmplitude = dynamicWindingAmplitudeBase * amplitudeFactor * movementPhaseAmplitudeFactor * sWaveDampening;
             
             const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.8; 
             const waveAngle = 2.5 * easedProgress * 2 * Math.PI; 
             
-            const offsetY = amplitude * Math.sin(waveAngle + phaseShift);
+            const offsetY = currentAmplitude * Math.sin(waveAngle + phaseShift);
             
             const segmentRotationFactor = (i / segmentCount); 
-            const baseSegmentWaveRotation = Math.cos(waveAngle + phaseShift + Math.PI/2) * dynamicMaxSegmentRotation * segmentRotationFactor * movementPhaseAmplitudeFactor;
+            const baseSegmentWaveRotation = Math.cos(waveAngle + phaseShift + Math.PI/2) * dynamicMaxSegmentRotation * segmentRotationFactor * movementPhaseAmplitudeFactor * sWaveDampening;
 
             let segmentOverallBendRotation = 0;
-            if (Math.abs(turnDeltaAngleRef.current) > 1) { // Apply bend for noticeable turns
-              const bendInfluenceFactor = (1 - (i / (segmentCount + 1))); // Closer to head = more influence
-              // Apply portion of total turn delta, scaled by progress and influence
-              segmentOverallBendRotation = (turnDeltaAngleRef.current * bendInfluenceFactor * 0.25) * Math.sin(progress * Math.PI);
+            if (Math.abs(turnDeltaAngleRef.current) > 1) { 
+              const bendInfluenceFactor = (1 - Math.pow(i / (segmentCount + 1), 0.5)); // Closer to head = more influence, less linear falloff
+              // Increased factor from 0.25 to 0.50 for stronger bend
+              segmentOverallBendRotation = (turnDeltaAngleRef.current * bendInfluenceFactor * 0.50) * Math.sin(progress * Math.PI);
             }
             
             const finalSegmentRotation = baseSegmentWaveRotation + segmentOverallBendRotation;
@@ -100,10 +104,10 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
             const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.06 * (i/segmentCount) * movementPhaseAmplitudeFactor;
 
             return {
-              ...segmentStyles[i],
+              // ...segmentStyles[i], // Keep other properties like transformOrigin from initial setup if needed
               transform: `translateX(${-i * bodySegmentBaseLength * dynamicLengthFactor}px) translateY(${offsetY}px) rotate(${finalSegmentRotation}deg)`,
               transformOrigin: '100% 50%', 
-              transition: `transform ${animationDuration * 0.15}ms cubic-bezier(0.33, 1, 0.68, 1)` // Faster transition for smoother updates
+              // No CSS transition during rAF loop for direct control
             };
           });
           setSegmentStyles(newSegmentStyles);
@@ -140,8 +144,6 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       }
       startTimeRef.current = null;
     };
-  // Only re-run this complex effect if isMoving or animationDuration changes.
-  // turnDeltaAngleRef is a ref and will have the latest value from the other effect.
   }, [isMoving, animationDuration, bodySegmentBaseWidth, bodySegmentBaseLength, segmentCount]);
 
 
@@ -163,7 +165,7 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
   const segmentsRender: JSX.Element[] = [];
 
   // Render segments from tail to head so head is on top
-  for (let i = segmentCount - 1; i > 0; i--) { 
+  for (let i = segmentCount - 1; i > 0; i--) { // i > 0 because head (segment 0) is rendered separately
     const isTailEnd = i === segmentCount - 1;
     const segmentLength = bodySegmentBaseLength * (1 - (i / segmentCount) * 0.2); 
     const segmentWidth = bodySegmentBaseWidth * (1 - (i / segmentCount) * 0.3);
@@ -217,7 +219,7 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       style={{
         transform: visualTransform,
         transition: isMoving ? `transform ${animationDuration}ms cubic-bezier(0.65, 0, 0.35, 1)` : 'none', 
-        transformOrigin: '0 0', // Pivot around the dragon's "nose" or intended center
+        transformOrigin: '0 0', 
         pointerEvents: 'none',
       }}
     >
@@ -225,7 +227,7 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
       {segmentsRender}
       
       {/* Head (segment 0), rendered on top */}
-      <g style={segmentStyles[0]}>
+      <g style={segmentStyles[0]}> {/* segmentStyles[0] should ideally be a static transform if head anim is fully global */}
         {/* Horns */}
         <path d={`M ${headScale * -0.2} ${headScale * -0.3} C ${headScale * -0.8} ${headScale * -0.9}, ${headScale * -1.3} ${headScale * -0.6}, ${headScale * -1.0} ${headScale * 0.1} L ${headScale * -1.1} ${headScale * -0.1} C ${headScale * -1.2} ${headScale * -0.5}, ${headScale * -0.6} ${headScale * -0.7}, ${headScale * -0.2} ${headScale * -0.35} Z`} className={`${hornColor} stroke-black/25`} strokeWidth={detailStrokeWidth}/>
         <path d={`M ${headScale * -0.2} ${headScale * 0.3} C ${headScale * -0.8} ${headScale * 0.9}, ${headScale * -1.3} ${headScale * 0.6}, ${headScale * -1.0} ${headScale * -0.1} L ${headScale * -1.1} ${headScale * 0.1} C ${headScale * -1.2} ${headScale * 0.5}, ${headScale * -0.6} ${headScale * 0.7}, ${headScale * -0.2} ${headScale * 0.35} Z`} className={`${hornColor} stroke-black/25`} strokeWidth={detailStrokeWidth}/>

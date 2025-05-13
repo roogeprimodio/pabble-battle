@@ -1,7 +1,7 @@
 // src/app/games/nine-pebbles/components/GameBoard.tsx
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
 import PlayerPawnDisplay from './Pawn';
 import { POINT_COORDINATES, ADJACENCY_LIST, canRemovePawn } from '@/lib/nine-pebbles-rules';
@@ -14,6 +14,7 @@ interface GameBoardDisplayProps {
   currentPlayer: Player;
   winner: Player | null;
   pawnToRemoveIndex: number | null; 
+  movingPawn?: { from: number; to: number; player: Player } | null;
 }
 
 const boardPoints = POINT_COORDINATES.map(p => ({
@@ -45,8 +46,6 @@ const linesDef = [
   { x1: boardPoints[7].cx, y1: boardPoints[7].cy, x2: boardPoints[23].cx, y2: boardPoints[23].cy },
 ];
 
-const cornerPointIds = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
-
 const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   board,
   onPointClick,
@@ -55,12 +54,73 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   currentPlayer,
   winner,
   pawnToRemoveIndex,
+  movingPawn,
 }) => {
   const pointRadius = 3; 
-  const clickableRadius = 5; 
+  const clickableRadius = 6; // Increased for better touch/click target
+
+  const [animatedPawn, setAnimatedPawn] = useState<{
+    player: Player;
+    currentCx: number;
+    currentCy: number;
+    targetCx: number;
+    targetCy: number;
+    trail: Array<{x: number, y: number}>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (movingPawn) {
+      const fromPoint = boardPoints[movingPawn.from];
+      const toPoint = boardPoints[movingPawn.to];
+      setAnimatedPawn({
+        player: movingPawn.player,
+        currentCx: fromPoint.cx,
+        currentCy: fromPoint.cy,
+        targetCx: toPoint.cx,
+        targetCy: toPoint.cy,
+        trail: [{x: fromPoint.cx, y: fromPoint.cy}],
+      });
+
+      let start: number | null = null;
+      const duration = 400; // ms
+
+      const step = (timestamp: number) => {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        
+        setAnimatedPawn(prev => {
+          if (!prev) return null;
+          const newCx = fromPoint.cx + (toPoint.cx - fromPoint.cx) * progress;
+          const newCy = fromPoint.cy + (toPoint.cy - fromPoint.cy) * progress;
+          
+          // Add to trail, keeping it short
+          const newTrail = [...prev.trail, {x: newCx, y: newCy}];
+          if (newTrail.length > 8) newTrail.shift();
+
+          return {
+            ...prev,
+            currentCx: newCx,
+            currentCy: newCy,
+            trail: newTrail,
+          };
+        });
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setAnimatedPawn(null);
+        }
+      };
+      requestAnimationFrame(step);
+    }
+  }, [movingPawn]);
+
 
   return (
-    <div className="w-full h-full bg-gradient-to-br from-secondary/20 via-secondary/30 to-secondary/20 rounded-lg shadow-inner p-2 sm:p-4 flex items-center justify-center">
+    <div 
+      className="w-full h-full bg-gradient-to-br from-secondary/20 via-secondary/30 to-secondary/20 rounded-lg shadow-inner p-2 sm:p-4 flex items-center justify-center"
+      onTouchStart={(e) => e.preventDefault()} // Prevents page scroll on touch for board area
+    >
       <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible">
         {/* Thematic background elements */}
         <defs>
@@ -70,27 +130,10 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             <stop offset="100%" stopColor="hsl(var(--primary) / 0)" />
           </radialGradient>
           <radialGradient id="demonicGlow" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
-            <stop offset="0%" stopColor="hsl(var(--destructive) / 0.1)" /> {/* Changed from accent to destructive */}
-            <stop offset="60%" stopColor="hsl(var(--destructive) / 0.05)" /> {/* Changed from accent to destructive */}
-            <stop offset="100%" stopColor="hsl(var(--destructive) / 0)" /> {/* Changed from accent to destructive */}
+            <stop offset="0%" stopColor="hsl(var(--destructive) / 0.1)" /> 
+            <stop offset="60%" stopColor="hsl(var(--destructive) / 0.05)" /> 
+            <stop offset="100%" stopColor="hsl(var(--destructive) / 0)" /> 
           </radialGradient>
-           <filter id="holyShine" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur" />
-            <feSpecularLighting in="blur" surfaceScale="5" specularConstant=".75" specularExponent="20" lightingColor="hsl(var(--primary))" result="specOut">
-              <fePointLight x="-5000" y="-10000" z="20000" />
-            </feSpecularLighting>
-            <feComposite in="specOut" in2="SourceAlpha" operator="in" result="specOut" />
-            <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
-          </filter>
-          <filter id="hellfireGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur" />
-            <feFlood floodColor="hsl(var(--destructive))" floodOpacity="0.7" result="flood" />
-            <feComposite in="flood" in2="blur" operator="in" result="colorBlur"/>
-            <feMerge>
-              <feMergeNode in="colorBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
         {currentPlayer === 1 && !winner && <rect width="100" height="100" fill="url(#angelicGlow)" className="transition-opacity duration-500" />}
         {currentPlayer === 2 && !winner && <rect width="100" height="100" fill="url(#demonicGlow)" className="transition-opacity duration-500" />}
@@ -108,6 +151,11 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
         ))}
 
         {boardPoints.map((point) => {
+          // Skip rendering the pawn at the 'from' position if it's currently moving
+          if (movingPawn && point.id === movingPawn.from) {
+            return null; 
+          }
+
           const playerAtPoint = board[point.id];
           const isCurrentlySelectedPawn = selectedPawnIndex === point.id;
           
@@ -136,13 +184,16 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             }
           }
           
-          const isCorner = cornerPointIds.includes(point.id);
-          const numberClassName = isCorner
-            ? "fill-accent dark:fill-accent font-bold" // Highlighted class for corners
-            : "fill-muted-foreground/70 dark:fill-muted-foreground/50"; // Default class
-
           return (
-            <g key={`point-group-${point.id}`} onClick={() => onPointClick(point.id)} className={`group ${pointInteractionClass}`}>
+            <g 
+              key={`point-group-${point.id}`} 
+              onClick={() => onPointClick(point.id)}
+              onTouchEnd={(e) => { // Use onTouchEnd for better tap reliability
+                e.preventDefault(); // Prevent ghost clicks
+                onPointClick(point.id);
+              }}
+              className={`group ${pointInteractionClass}`}
+            >
               <circle 
                 cx={point.cx}
                 cy={point.cy}
@@ -177,31 +228,41 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                         r={pointRadius * 0.9} 
                         fill="transparent"
                         strokeDasharray="0.6 0.6" 
-                        className={`pointer-events-none animate-pulse ${currentPlayer === 1 ? 'stroke-primary/70' : 'stroke-destructive/70'}`} // Changed from accent to destructive
+                        className={`pointer-events-none animate-pulse ${currentPlayer === 1 ? 'stroke-primary/70' : 'stroke-destructive/70'}`} 
                         strokeWidth="0.6"
                     />
-                )}
-                {!playerAtPoint && (
-                  <text
-                    x={point.cx}
-                    y={point.cy + pointRadius + 2.5} 
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={isCorner ? "2.2" : "1.8"} 
-                    className={`${numberClassName} select-none pointer-events-none font-mono`}
-                    style={{ userSelect: 'none' }} 
-                  >
-                    {point.id}
-                  </text>
                 )}
             </g>
           );
         })}
+
+        {/* Animated Pawn with Trail */}
+        {animatedPawn && (
+          <g>
+            {/* Trail */}
+            {animatedPawn.trail.map((pos, index) => (
+              <circle
+                key={`trail-${index}`}
+                cx={pos.x}
+                cy={pos.y}
+                r={pointRadius * 0.3 * (index / animatedPawn.trail.length)} // Smaller and fades
+                className={`${animatedPawn.player === 1 ? 'fill-primary/50' : 'fill-destructive/50'} opacity-${(index / animatedPawn.trail.length) * 50 + 20}`}
+              />
+            ))}
+            {/* Moving Pawn */}
+            <PlayerPawnDisplay
+              player={animatedPawn.player}
+              cx={animatedPawn.currentCx}
+              cy={animatedPawn.currentCy}
+              radius={pointRadius}
+              isSelected={false} // Moving pawns are not "selected" in the typical sense
+            />
+          </g>
+        )}
       </svg>
     </div>
   );
 };
 
 export default GameBoardDisplay;
-
     

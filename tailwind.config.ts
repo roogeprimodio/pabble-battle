@@ -130,13 +130,25 @@ export default {
           '50%': { opacity: '0.7', filter: 'brightness(1.5) drop-shadow(0 0 8px hsl(var(--destructive)))', transform: 'scale(1.1) rotate(5deg)' },
           '100%': { opacity: '0', filter: 'brightness(2) drop-shadow(0 0 15px hsl(var(--destructive)))', transform: 'scale(0.5) rotate(-10deg)' },
         },
-        'vulnerable-to-holy': { // For a Demon pawn targeted by an Angel
-          '0%, 100%': { filter: 'drop-shadow(0 0 1px hsl(var(--accent) / 0.7)) drop-shadow(0 0 2px hsl(var(--accent) / 0.5))', stroke: 'hsl(var(--accent))', strokeWidth: '0.35px', opacity: '0.85' },
-          '50%': { filter: 'drop-shadow(0 0 3px hsl(var(--accent))) drop-shadow(0 0 5px hsl(var(--accent) / 0.7))', stroke: 'hsl(var(--accent))', strokeWidth: '0.45px', opacity: '1', transform: 'scale(1.03)' },
+        'vulnerable-to-holy': { // For a Demon pawn targeted by an Angel (uses accent color)
+          '0%, 100%': {
+            filter: 'drop-shadow(0 0 2px hsl(var(--accent) / 0.5))',
+            opacity: '0.85',
+          },
+          '50%': {
+            filter: 'drop-shadow(0 0 4px hsl(var(--accent) / 0.8)) drop-shadow(0 0 6px hsl(var(--accent) / 0.4))',
+            opacity: '1',
+          },
         },
-        'vulnerable-to-dark': { // For an Angel pawn targeted by a Demon
-          '0%, 100%': { filter: 'drop-shadow(0 0 1px hsl(var(--foreground) / 0.5)) drop-shadow(0 0 2px hsl(var(--foreground) / 0.3))', stroke: 'hsl(var(--foreground) / 0.6)', strokeWidth: '0.35px', opacity: '0.85' },
-          '50%': { filter: 'drop-shadow(0 0 3px hsl(var(--foreground) / 0.8)) drop-shadow(0 0 5px hsl(var(--foreground) / 0.6))', stroke: 'hsl(var(--foreground))', strokeWidth: '0.45px', opacity: '1', transform: 'scale(1.03)' },
+        'vulnerable-to-dark': { // For an Angel pawn targeted by a Demon (uses destructive color)
+          '0%, 100%': {
+            filter: 'drop-shadow(0 0 2px hsl(var(--destructive) / 0.5))',
+            opacity: '0.85',
+          },
+          '50%': {
+            filter: 'drop-shadow(0 0 4px hsl(var(--destructive) / 0.8)) drop-shadow(0 0 6px hsl(var(--destructive) / 0.4))',
+            opacity: '1',
+          },
         },
   		},
   		animation: {

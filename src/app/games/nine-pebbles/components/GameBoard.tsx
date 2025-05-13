@@ -1,11 +1,10 @@
 // src/app/games/nine-pebbles/components/GameBoard.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import type { GameBoardArray, Player } from '@/lib/nine-pebbles-rules';
 import PlayerPawnDisplay from './Pawn';
 import { POINT_COORDINATES, ADJACENCY_LIST } from '@/lib/nine-pebbles-rules';
-import Dragon from './Dragon'; // Changed from Snake to Dragon
 
 interface GameBoardDisplayProps {
   board: GameBoardArray;
@@ -45,68 +44,6 @@ const linesDef = [
   { x1: boardPoints[7].cx, y1: boardPoints[7].cy, x2: boardPoints[23].cx, y2: boardPoints[23].cy },
 ];
 
-// Helper to find *any* valid empty spot for the dragon, prioritizing current if valid.
-function getSafeDragonSpot(
-  currentDragonIdx: number | null,
-  board: GameBoardArray
-): number | null {
-  const openSpots = board.map((p, i) => (p === null ? i : -1)).filter(i => i !== -1);
-  if (openSpots.length === 0) return null;
-
-  if (currentDragonIdx !== null && board[currentDragonIdx] === null) {
-    return currentDragonIdx; // Current spot is safe and empty
-  }
-  // Current spot is unsafe or null, pick any other open spot
-  const randomIndex = Math.floor(Math.random() * openSpots.length);
-  return openSpots[randomIndex];
-}
-
-// Helper to find the NEAREST *DIFFERENT* open spot for the dragon to move to.
-function findNearestNewTarget(
-  currentDragonIdx: number, // Assumed to be a valid, empty spot
-  board: GameBoardArray,
-  adjacencyList: number[][]
-): number | null {
-  const q: { point: number; dist: number }[] = [];
-  const visited = new Set<number>([currentDragonIdx]); 
-  
-  for (const neighbor of adjacencyList[currentDragonIdx]) {
-    if (board[neighbor] === null) { 
-        q.push({ point: neighbor, dist: 1 }); 
-    }
-    visited.add(neighbor); 
-  }
-
-  const potentialTargets: {point: number, dist: number}[] = [];
-
-  let head = 0; 
-  while(head < q.length) {
-    const current = q[head++]; 
-
-    if (board[current.point] === null && current.point !== currentDragonIdx) {
-      potentialTargets.push(current);
-    }
-    
-    if(potentialTargets.length > 0 && current.dist > potentialTargets[0].dist) break;
-
-    for (const neighbor of adjacencyList[current.point]) {
-      if (!visited.has(neighbor)) {
-        visited.add(neighbor);
-        q.push({ point: neighbor, dist: current.dist + 1 });
-      }
-    }
-  }
-  
-  if (potentialTargets.length === 0) return null; 
-
-  potentialTargets.sort((a,b) => { 
-      if(a.dist !== b.dist) return a.dist - b.dist;
-      return a.point - b.point;
-  });
-  
-  return potentialTargets[0].point; 
-}
-
 
 const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   board,
@@ -114,79 +51,10 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
   selectedPawnIndex,
   gamePhase,
   currentPlayer,
-  winner,
+  winner, // winner prop is now unused, consider removing if not needed elsewhere
 }) => {
   const pointRadius = 3; 
   const clickableRadius = 5; 
-
-  const [dragonCurrentBoardIndex, setDragonCurrentBoardIndex] = useState<number | null>(null);
-  const [dragonTargetBoardIndex, setDragonTargetBoardIndex] = useState<number | null>(null);
-  const [dragonIsMovingToNext, setDragonIsMovingToNext] = useState(false);
-  const [dragonVisible, setDragonVisible] = useState(false);
-
-  const DRAGON_ANIMATION_DURATION = 1500; // ms, slightly longer for more elaborate movement
-  const DRAGON_WAIT_DURATION = 3000; // ms
-
-  // Effect 1: Dragon Placement/Correction
-  useEffect(() => {
-    if (gamePhase === 'playerSelection' || winner !== null) {
-      setDragonVisible(false);
-      return;
-    }
-    if (dragonIsMovingToNext) return;
-
-    const safeSpot = getSafeDragonSpot(dragonCurrentBoardIndex, board);
-
-    if (safeSpot !== null) {
-      if (dragonCurrentBoardIndex !== safeSpot) {
-        setDragonCurrentBoardIndex(safeSpot); 
-      }
-      setDragonVisible(true);
-    } else {
-      setDragonVisible(false); 
-    }
-  }, [board, gamePhase, winner, dragonIsMovingToNext, dragonCurrentBoardIndex]);
-
-
-  // Effect 2: Dragon Movement Cycle
-  useEffect(() => {
-    if (!dragonVisible || dragonCurrentBoardIndex === null || gamePhase === 'playerSelection' || winner !== null) {
-      return; 
-    }
-
-    let waitTimer: NodeJS.Timeout;
-    let animationEndTimer: NodeJS.Timeout;
-
-    if (!dragonIsMovingToNext) { 
-      waitTimer = setTimeout(() => {
-        const target = findNearestNewTarget(dragonCurrentBoardIndex, board, ADJACENCY_LIST);
-        if (target !== null) { 
-          setDragonTargetBoardIndex(target);
-          setDragonIsMovingToNext(true);
-        }
-      }, DRAGON_WAIT_DURATION);
-    } else { 
-      if (dragonTargetBoardIndex === null) { 
-        setDragonIsMovingToNext(false); 
-        return;
-      }
-      animationEndTimer = setTimeout(() => {
-        setDragonCurrentBoardIndex(dragonTargetBoardIndex); 
-        setDragonTargetBoardIndex(null); 
-        setDragonIsMovingToNext(false);  
-      }, DRAGON_ANIMATION_DURATION);
-    }
-
-    return () => { 
-      clearTimeout(waitTimer);
-      clearTimeout(animationEndTimer);
-    };
-  }, [dragonVisible, dragonCurrentBoardIndex, dragonIsMovingToNext, dragonTargetBoardIndex, board, gamePhase, winner, DRAGON_ANIMATION_DURATION, DRAGON_WAIT_DURATION]);
-
-
-  const currentDragonCoords = dragonCurrentBoardIndex !== null ? boardPoints[dragonCurrentBoardIndex] : null;
-  const targetDragonCoords = dragonTargetBoardIndex !== null ? boardPoints[dragonTargetBoardIndex] : currentDragonCoords;
-
 
   return (
     <div className="w-full h-full bg-secondary/20 rounded-lg shadow-inner p-2 sm:p-4 flex items-center justify-center">
@@ -202,15 +70,6 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
             strokeWidth="0.8"
           />
         ))}
-
-        {dragonVisible && currentDragonCoords && targetDragonCoords && (
-          <Dragon // Changed from Snake
-            currentPos={{ x: currentDragonCoords.cx, y: currentDragonCoords.cy }}
-            targetPos={{ x: targetDragonCoords.cx, y: targetDragonCoords.cy }}
-            isMoving={dragonIsMovingToNext}
-            animationDuration={DRAGON_ANIMATION_DURATION}
-          />
-        )}
 
         {boardPoints.map((point) => {
           const playerAtPoint = board[point.id];

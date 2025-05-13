@@ -37,11 +37,13 @@ const NinePebblesPage: React.FC = () => {
     2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
   });
   
-  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0); // Number of pawns the current player must place in their current turn sequence (1 or 2)
-  const [isCurrentPlayerOnInitialTwoPawnTurn, setIsCurrentPlayerOnInitialTwoPawnTurn] = useState(false); // Tracks if current player is on their specific first 2-pawn turn
+  // pawnsToPlaceThisTurn: How many pawns the current player MUST place in their CURRENT action sequence (e.g., 2 for initial, 1 later)
+  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0); 
+  // isCurrentPlayerOnInitialTwoPawnTurn: Tracks if the current player is specifically on their first 2-pawn placement turn.
+  const [isCurrentPlayerOnInitialTwoPawnTurn, setIsCurrentPlayerOnInitialTwoPawnTurn] = useState(false); 
   
   const [selectedPawnIndex, setSelectedPawnIndex] = useState<number | null>(null);
-  const [pawnToRemoveIndex, setPawnToRemoveIndex] = useState<number | null>(null);
+  const [pawnToRemoveIndex, setPawnToRemoveIndex] = useState<number | null>(null); // For animating removal
   const [winner, setWinner] = useState<Player | null>(null);
   const [message, setMessage] = useState<string>('Choose which side will make the first move.');
   const { toast } = useToast();
@@ -82,6 +84,13 @@ const NinePebblesPage: React.FC = () => {
       } else if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
          setMessage("All pawns placed. Movement phase commencing.");
       } else {
+         // This case implies pawnsToPlaceThisTurn is 0 for the current player,
+         // OR playerStats[currentPlayer].pawnsToPlace is 0.
+         // If it's just pawnsToPlaceThisTurn = 0, it means their action sequence for THIS turn is done.
+         // The game should then proceed to switch player or phase.
+         // A message like "Waiting for opponent" or specific phase transition message might be better handled
+         // by the state that sets pawnsToPlaceThisTurn to 0 before switching.
+         // For now, this covers the scenario where a player might have pawns overall but not for this specific turn action.
          setMessage(`${currentPlayerName}'s turn. No more pawns to place this turn or overall.`);
       }
     } else if (gamePhase === 'movement') {
@@ -116,10 +125,8 @@ const NinePebblesPage: React.FC = () => {
             nextPlayerIsOnInitialTurn = true;
         }
         
-        // Actual number of pawns the next player can place in their upcoming turn sequence
         const actualCanPlaceNext = Math.min(numToPlaceForNextPlayerTurn, playerStats[nextPlayer].pawnsToPlace);
         setPawnsToPlaceThisTurn(actualCanPlaceNext);
-        // Only set true if they are eligible AND will actually place 2 (e.g. not if they only have 1 pawn left total)
         setIsCurrentPlayerOnInitialTwoPawnTurn(nextPlayerIsOnInitialTurn && actualCanPlaceNext === 2);
     }
     // Else, if in movement or other phases, pawnsToPlaceThisTurn and isCurrentPlayerOnInitialTwoPawnTurn are not changed here.
@@ -167,51 +174,58 @@ const NinePebblesPage: React.FC = () => {
     }
     
     // Win if opponent has no valid moves (only relevant after placement phase)
-    if ((gamePhase === 'movement') || (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) ) {
-        const playerToCheckForNoMoves = gamePhase === 'removing' ? (currentPlayer === 1 ? 2 : 1) : currentPlayer;
-        const opponentOfPlayerToCheck = playerToCheckForNoMoves === 1 ? 2 : 1;
-
-        if (updatedPlayerStats[playerToCheckForNoMoves].pawnsToPlace === 0 && updatedPlayerStats[playerToCheckForNoMoves].pawnsOnBoard >=3) {
-             let hasMoves = false;
-            for (let i = 0; i < TOTAL_POINTS; i++) {
-              if (updatedBoard[i] === playerToCheckForNoMoves) { 
-                if (ADJACENCY_LIST[i].some(adj => updatedBoard[adj] === null)) { 
-                  hasMoves = true;
-                  break;
+    const allPawnsPlacedByBoth = updatedPlayerStats[1].pawnsToPlace === 0 && updatedPlayerStats[2].pawnsToPlace === 0;
+    if (allPawnsPlacedByBoth) { // Only check for no moves if all placement is done
+        // Determine whose turn it *would* be to check if they have moves
+        // If currently removing, the check applies to the player whose turn it was *before* removal (i.e., currentPlayer)
+        // If just regular movement, check current player.
+        // For robustness, let's consider the player whose turn is next *if* the game didn't end.
+        // Or more simply, check BOTH players if all pawns are placed.
+        
+        for (const player of [1, 2] as Player[]) {
+            if (updatedPlayerStats[player].pawnsOnBoard >= 3) { // Only check if they have enough pawns to need to move
+                let hasMoves = false;
+                for (let i = 0; i < TOTAL_POINTS; i++) {
+                    if (updatedBoard[i] === player) { 
+                        if (ADJACENCY_LIST[i].some(adj => updatedBoard[adj] === null)) { 
+                            hasMoves = true;
+                            break;
+                        }
+                    }
                 }
-              }
-            }
-            if (!hasMoves) {
-              setWinner(opponentOfPlayerToCheck); 
-              setGamePhase('gameOver');
-              return true;
+                if (!hasMoves) {
+                    setWinner(player === 1 ? 2 : 1); // The other player wins
+                    setGamePhase('gameOver');
+                    return true;
+                }
             }
         }
     }
     return false;
-  }, [gamePhase, winner, currentPlayer, playerStats]); 
+  }, [gamePhase, winner]); // Removed currentPlayer and playerStats to avoid re-check on every minor stat change not related to win
 
 
   useEffect(() => {
     if (!winner && gamePhase !== 'playerSelection' && gamePhase !== 'animatingRemoval' && gamePhase !== 'gameOver') {
-      const gameEnded = checkWinCondition(board, playerStats);
-      if(gameEnded) {
-        updateMessageAndPawnsToPlace(); 
-      }
+      // Pass board and playerStats directly as they are the most relevant dependencies for checking win.
+      checkWinCondition(board, playerStats);
     }
-  }, [board, playerStats, winner, gamePhase, checkWinCondition, updateMessageAndPawnsToPlace]); 
+  }, [board, playerStats, winner, gamePhase, checkWinCondition]); 
   
 
   const handlePlayerSelect = (player: Player) => {
     setIsLoading(true);
     setCurrentPlayer(player);
     setGamePhase('placement');
+    // Reset stats completely for a new game start
     setPlayerStats({ 
       1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
       2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
     });
+    // The selected player starts by placing 2 pawns.
     setPawnsToPlaceThisTurn(Math.min(2, PAWNS_PER_PLAYER)); 
     setIsCurrentPlayerOnInitialTwoPawnTurn(true); 
+    
     toast({ 
       title: "Battle Commences!", 
       description: `${getPlayerThematicName(player)} will lead the charge. Place 2 pawns.`,
@@ -224,7 +238,7 @@ const NinePebblesPage: React.FC = () => {
     if (winner || gamePhase === 'gameOver' || gamePhase === 'playerSelection' || gamePhase === 'animatingRemoval') return;
 
     let newBoard = [...board];
-    let updatedPlayerStats = JSON.parse(JSON.stringify(playerStats)) as typeof playerStats;
+    let updatedPlayerStats = JSON.parse(JSON.stringify(playerStats)) as typeof playerStats; // Deep copy for modification
     const currentPlayerName = getPlayerThematicName(currentPlayer);
 
     if (gamePhase === 'placement') {
@@ -235,66 +249,84 @@ const NinePebblesPage: React.FC = () => {
         
         const remainingForThisActionSequence = pawnsToPlaceThisTurn - 1; 
         
-        setBoard(newBoard); 
+        setBoard(newBoard); // Update board first
 
         if (checkMill(newBoard, currentPlayer, index)) {
-          setPlayerStats(updatedPlayerStats); 
-          setPawnsToPlaceThisTurn(remainingForThisActionSequence); 
+          setPlayerStats(updatedPlayerStats); // Update stats before going to 'removing'
+          setPawnsToPlaceThisTurn(remainingForThisActionSequence); // Update how many left for *this turn's action*
           setGamePhase('removing');
+          // Message will update due to useEffect (gamePhase change)
         } else {
+          // No mill formed
           if (remainingForThisActionSequence === 0) { 
-            if (isCurrentPlayerOnInitialTwoPawnTurn) { 
+            // Current player finished their placements for this turn sequence
+            if (isCurrentPlayerOnInitialTwoPawnTurn) { // If this was an initial 2-pawn turn
                  updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
             }
-            setPlayerStats(updatedPlayerStats);
-            switchPlayerAndPhase(); 
+            setPlayerStats(updatedPlayerStats); // Final stats update for this player's action
+            // setPawnsToPlaceThisTurn is handled by switchPlayerAndPhase
+            switchPlayerAndPhase(); // Switch player and setup their pawnsToPlace for next turn
           } else {
+            // Still has pawns to place in *this* action sequence (e.g. placed 1 of 2)
             setPlayerStats(updatedPlayerStats);
             setPawnsToPlaceThisTurn(remainingForThisActionSequence);
+            // Message will update due to useEffect (pawnsToPlaceThisTurn, playerStats change)
           }
         }
       } else if (newBoard[index] !== null) {
         toast({ title: "Invalid Placement", description: "This position is already occupied.", variant: "destructive" });
       } else if (pawnsToPlaceThisTurn === 0 || updatedPlayerStats[currentPlayer].pawnsToPlace === 0) {
+         // This case should ideally be rare if UI reflects game state well.
+         // It means the player tried to place when they had no more placements for this specific turn/action, or overall.
          toast({ title: "No Pawns to Place", description: "You have no more pawns for this turn or overall.", variant: "default" });
       }
     } else if (gamePhase === 'movement') {
       if (selectedPawnIndex === null) {
         if (newBoard[index] === currentPlayer) {
           setSelectedPawnIndex(index);
+          // Message will update via useEffect if needed (though typically selection doesn't change main message)
         } else {
           toast({ title: "Invalid Selection", description: `Select one of your own ${currentPlayerName}'s pawns.`, variant: "destructive" });
         }
       } else {
-        if (index === selectedPawnIndex) { 
+        // A pawn is already selected, trying to move it
+        if (index === selectedPawnIndex) { // Clicked selected pawn again to deselect
             setSelectedPawnIndex(null); 
             return;
         }
+
         if (newBoard[index] === null && ADJACENCY_LIST[selectedPawnIndex].includes(index)) {
+          // Valid move
           newBoard[selectedPawnIndex] = null;
           newBoard[index] = currentPlayer;
-          const movedPawnIndex = index; 
+          const movedPawnIndex = index; // Keep track of where the pawn moved to
           
-          setSelectedPawnIndex(null);
-          setBoard(newBoard); 
+          setSelectedPawnIndex(null); // Deselect after move
+          setBoard(newBoard); // Update board first
 
           if (checkMill(newBoard, currentPlayer, movedPawnIndex)) {
+            // No playerStats update needed here before 'removing' as it's a move, not placement count change
             setGamePhase('removing');
+            // Message will update due to useEffect (gamePhase change)
           } else {
-            if (!checkWinCondition(newBoard, updatedPlayerStats)) { 
+            // No mill, check win condition then switch player
+             if (!checkWinCondition(newBoard, updatedPlayerStats)) { // Pass current board and original stats (as no pawns changed count)
                 switchPlayerAndPhase();
-            }
+             }
+             // If win condition met, message updates via winner state change in useEffect
           }
         } else {
           toast({ title: "Invalid Move", description: "You can only move to an adjacent empty spot.", variant: "destructive" });
+          setSelectedPawnIndex(null); // Deselect on invalid move attempt for clarity
         }
       }
     } else if (gamePhase === 'removing') {
       const opponent = currentPlayer === 1 ? 2 : 1;
       if (newBoard[index] === opponent && canRemovePawn(newBoard, index, opponent)) {
         
-        setPawnToRemoveIndex(index); 
-        setGamePhase('animatingRemoval'); 
+        setPawnToRemoveIndex(index); // Trigger animation
+        setGamePhase('animatingRemoval'); // Special phase for animation
+        // Message for animatingRemoval will be set by useEffect
         
         const toastIcon = currentPlayer === 1 ? <Sparkles className="inline-block h-4 w-4 text-yellow-300" /> : <Skull className="inline-block h-4 w-4 text-red-400" />;
         toast({ 
@@ -305,38 +337,44 @@ const NinePebblesPage: React.FC = () => {
         });
 
         setTimeout(() => {
-            let boardAfterRemoval = [...board]; 
-            boardAfterRemoval[index] = null;
+            let boardAfterRemoval = [...newBoard]; // Use newBoard which might have changes from placement if mill formed on placement
+            boardAfterRemoval[index] = null; // Actual removal
             
-            // Use a fresh copy of playerStats from state for modification
-            let statsAfterRemoval = JSON.parse(JSON.stringify(playerStats)); 
+            let statsAfterRemoval = JSON.parse(JSON.stringify(playerStats)); // Crucial: use playerStats from *before* this click started if it was a move. If placement, it's already updated.
+                                                                           // To be safe, always use the latest playerStats state before this block.
+            statsAfterRemoval = JSON.parse(JSON.stringify(playerStats)); // Re-fetch to be absolutely sure we have latest for opponent stats.
             statsAfterRemoval[opponent].pawnsOnBoard -= 1;
 
             setBoard(boardAfterRemoval); 
-            // playerStats will be updated after this block or within checkWinCondition/switchPlayerAndPhase
-            setPawnToRemoveIndex(null);
+            setPawnToRemoveIndex(null); // Reset animation state
 
             const gameWon = checkWinCondition(boardAfterRemoval, statsAfterRemoval); 
             
             if (!gameWon) {
                 const stillInPlacementPhaseOverall = statsAfterRemoval[1].pawnsToPlace > 0 || statsAfterRemoval[2].pawnsToPlace > 0;
                 
+                // If the current player still has pawns to place for THIS TURN'S ACTION SEQUENCE
+                // (e.g. formed a mill on the first of two initial placements)
                 if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) {
-                    setPlayerStats(statsAfterRemoval); // Update stats, current player continues placement
+                    setPlayerStats(statsAfterRemoval); 
                     setGamePhase('placement'); 
+                    // Current player continues their placement turn. Message will update via useEffect.
                 } else {
+                    // Current player's placement action for this turn is complete.
+                    // Or, if it was movement phase, their move+removal is done.
                     let finalStatsForThisTurn = JSON.parse(JSON.stringify(statsAfterRemoval));
-                    if (isCurrentPlayerOnInitialTwoPawnTurn) { 
+                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0) { // Check if this was the last action of the initial 2-pawn turn
                         finalStatsForThisTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
                     }
                     setPlayerStats(finalStatsForThisTurn); 
                     
-                    setGamePhase(stillInPlacementPhaseOverall ? 'placement' : 'movement');
-                    updateMessageAndPawnsToPlace(); // Update message before switching player
+                    const nextPhase = stillInPlacementPhaseOverall ? 'placement' : 'movement';
+                    setGamePhase(nextPhase);
+                    // Message update will be handled by useEffect after switchPlayerAndPhase completes.
                     switchPlayerAndPhase(); 
                 }
             } else {
-                 setPlayerStats(statsAfterRemoval); 
+                 setPlayerStats(statsAfterRemoval); // Update stats on win. Message will update via useEffect.
             }
         }, PAWN_REMOVAL_ANIMATION_DURATION);
 

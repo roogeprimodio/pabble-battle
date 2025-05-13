@@ -138,12 +138,25 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                   highlightAsRemovableCandidateForPlayer={highlightForRemovable} // For candidate highlight
                 />
               ) : ( 
-                <circle
-                  cx={point.cx}
-                  cy={point.cy}
-                  r={pointRadius * 0.65} 
-                  className={pointMarkerClass}
-                />
+                <>
+                  <circle
+                    cx={point.cx}
+                    cy={point.cy}
+                    r={pointRadius * 0.65} 
+                    className={pointMarkerClass}
+                  />
+                  <text
+                    x={point.cx}
+                    y={point.cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize="2" // Adjust font size as needed
+                    className="fill-muted-foreground select-none pointer-events-none"
+                    style={{ userSelect: 'none' }} // Ensure text is not selectable
+                  >
+                    {point.id}
+                  </text>
+                </>
               )}
                {gamePhase === 'movement' && selectedPawnIndex !== null && ADJACENCY_LIST[selectedPawnIndex].includes(point.id) && !board[point.id] && (
                     <circle
@@ -155,6 +168,19 @@ const GameBoardDisplay: React.FC<GameBoardDisplayProps> = ({
                         className={`pointer-events-none animate-pulse ${currentPlayer === 1 ? 'stroke-primary/70' : 'stroke-accent/70'}`}
                         strokeWidth="0.6"
                     />
+                )}
+                {!playerAtPoint && (
+                  <text
+                    x={point.cx}
+                    y={point.cy + pointRadius + 2.5} // Position number below the point
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize="1.8" // Adjust font size as needed
+                    className="fill-muted-foreground/70 select-none pointer-events-none font-mono"
+                    style={{ userSelect: 'none' }} // Ensure text is not selectable
+                  >
+                    {point.id}
+                  </text>
                 )}
             </g>
           );

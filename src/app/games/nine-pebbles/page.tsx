@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import GameBoardDisplay from './components/GameBoard';
 import PlayerPawnDisplay from './components/Pawn';
 import CombinedPlayerStatusDisplay from './components/PlayerStatusDisplay';
+import GameBanner from './components/GameBanner'; // Import the new banner component
 import {
   TOTAL_POINTS,
   PAWNS_PER_PLAYER,
@@ -72,15 +73,17 @@ const NinePebblesPage: React.FC = () => {
 
     if (allPawnsPlacedByBoth && currentPhaseForLogic === 'placement') {
         nextPhase = 'movement';
-        setPawnsToPlaceThisTurn(0);
+        setPawnsToPlaceThisTurn(0); // No more pawns to place in movement phase
         setIsCurrentPlayerOnInitialTwoPawnTurn(false);
     } else if (currentPhaseForLogic === 'placement') { 
+        // Determine pawns for next player's turn
         let numToPlaceForNextPlayerTurn = 1;
         let nextPlayerIsOnInitialTurn = false;
         if (!effectivePlayerStats[nextPlayer].hasCompletedInitialTwoPawnPlacement && effectivePlayerStats[nextPlayer].pawnsToPlace > 0) {
             numToPlaceForNextPlayerTurn = 2;
             nextPlayerIsOnInitialTurn = true;
         }
+        // Ensure they don't place more than they have left
         const actualCanPlaceNext = Math.min(numToPlaceForNextPlayerTurn, effectivePlayerStats[nextPlayer].pawnsToPlace);
         setPawnsToPlaceThisTurn(actualCanPlaceNext);
         setIsCurrentPlayerOnInitialTwoPawnTurn(nextPlayerIsOnInitialTurn && actualCanPlaceNext === 2);
@@ -88,6 +91,7 @@ const NinePebblesPage: React.FC = () => {
     
     setGamePhase(nextPhase);
     setCurrentPlayer(nextPlayer);
+    // Message will be updated by the useEffect watching these state changes
 }, [currentPlayer]);
 
 
@@ -100,7 +104,7 @@ const NinePebblesPage: React.FC = () => {
         } else if (gamePhase === 'animatingRemoval') {
             const removingPlayerName = getPlayerThematicName(currentPlayer);
             const opponentPlayerName = getPlayerThematicName(currentPlayer === 1 ? 2 : 1);
-            setMessage(`${removingPlayerName} are banishing a ${opponentPlayerName}' pawn!`);
+            setMessage(`${removingPlayerName} are banishing a ${opponentPlayerName}'s pawn!`);
         }
         return;
     }
@@ -111,9 +115,19 @@ const NinePebblesPage: React.FC = () => {
       if (pawnsToPlaceThisTurn > 0 && playerStats[currentPlayer].pawnsToPlace > 0) {
         setMessage(`${currentPlayerName}'s turn. Place ${pawnsToPlaceThisTurn} pawn${pawnsToPlaceThisTurn > 1 ? 's' : ''}.`);
       } else if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
-         setMessage("All pawns placed. Movement phase starting.");
+         // This state should ideally be handled by executeSwitchPlayerAndPhase transitioning to 'movement'
+         // If somehow reached here, it implies movement phase should start or is next.
+         setMessage("All pawns placed. Movement phase is next or has begun.");
       } else {
-         setMessage(`${currentPlayerName}'s turn is processing.`);
+         // This case might indicate an issue or end of placement for current player before overall placement ends
+         // It could also mean it's the opponent's turn to place after a removal.
+         const nextPlayer = currentPlayer === 1 ? 2 : 1;
+         const nextPlayerName = getPlayerThematicName(nextPlayer);
+         if(playerStats[nextPlayer].pawnsToPlace > 0){
+            setMessage(`${nextPlayerName}'s turn. Place ${playerStats[nextPlayer].hasCompletedInitialTwoPawnPlacement ? 1:2} pawn(s).`);
+         } else {
+            setMessage(`${currentPlayerName}'s turn is processing or awaiting next phase.`);
+         }
       }
     } else if (gamePhase === 'movement') {
       setMessage(`${currentPlayerName}'s turn. Select a pawn to move.`);
@@ -133,7 +147,7 @@ const NinePebblesPage: React.FC = () => {
     setIsLoading(true);
     setBoard(createInitialBoard());
     setGamePhase('playerSelection');
-    setCurrentPlayer(1); 
+    setCurrentPlayer(1); // Default to player 1 or could be random
     setPlayerStats({
       1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
       2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
@@ -141,8 +155,8 @@ const NinePebblesPage: React.FC = () => {
     setSelectedPawnIndex(null);
     setPawnToRemoveIndex(null);
     setWinner(null);
-    setPawnsToPlaceThisTurn(0);
-    setIsCurrentPlayerOnInitialTwoPawnTurn(false);
+    setPawnsToPlaceThisTurn(0); // Will be set by handlePlayerSelect
+    setIsCurrentPlayerOnInitialTwoPawnTurn(false); // Will be set by handlePlayerSelect
     setMovingPawn(null);
     toast({ 
         title: "Game Reset", 
@@ -156,10 +170,11 @@ const NinePebblesPage: React.FC = () => {
     if (gamePhase === 'playerSelection' || winner || gamePhase === 'animatingRemoval') return false;
 
     const p1OnBoard = updatedPlayerStats[1].pawnsOnBoard;
-    const p1CanPlace = updatedPlayerStats[1].pawnsToPlace > 0;
+    const p1CanPlace = updatedPlayerStats[1].pawnsToPlace > 0; // If player 1 still has pawns to place
     const p2OnBoard = updatedPlayerStats[2].pawnsOnBoard;
-    const p2CanPlace = updatedPlayerStats[2].pawnsToPlace > 0;
+    const p2CanPlace = updatedPlayerStats[2].pawnsToPlace > 0; // If player 2 still has pawns to place
 
+    // Check if a player has less than 3 pawns on board AFTER all their pawns have been placed
     if (!p1CanPlace && p1OnBoard < 3) {
       setWinner(2); setGamePhase('gameOver'); return true;
     }
@@ -167,21 +182,22 @@ const NinePebblesPage: React.FC = () => {
       setWinner(1); setGamePhase('gameOver'); return true;
     }
     
+    // Check for no valid moves (only if all pawns are placed for both players)
     const allPawnsPlacedByBoth = updatedPlayerStats[1].pawnsToPlace === 0 && updatedPlayerStats[2].pawnsToPlace === 0;
-    if (allPawnsPlacedByBoth) { 
+    if (allPawnsPlacedByBoth) { // Only check for no moves if in movement phase (implicitly)
         for (const player of [1, 2] as Player[]) {
-            if (updatedPlayerStats[player].pawnsOnBoard >= 3) { 
+            if (updatedPlayerStats[player].pawnsOnBoard >= 3) { // Only if they have enough pawns to potentially move
                 let hasMoves = false;
                 for (let i = 0; i < TOTAL_POINTS; i++) {
-                    if (updatedBoard[i] === player) { 
-                        if (ADJACENCY_LIST[i].some(adj => updatedBoard[adj] === null)) { 
+                    if (updatedBoard[i] === player) { // For each of the current player's pawns
+                        if (ADJACENCY_LIST[i].some(adj => updatedBoard[adj] === null)) { // Check if any adjacent spot is empty
                             hasMoves = true;
                             break;
                         }
                     }
                 }
                 if (!hasMoves) {
-                    setWinner(player === 1 ? 2 : 1); 
+                    setWinner(player === 1 ? 2 : 1); // The other player wins
                     setGamePhase('gameOver');
                     return true;
                 }
@@ -203,11 +219,11 @@ const NinePebblesPage: React.FC = () => {
     setIsLoading(true);
     setCurrentPlayer(player);
     setGamePhase('placement');
+    // Reset stats for a new game, pawns to place is PAWNS_PER_PLAYER
     setPlayerStats({ 
       1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
       2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
-    });
-    setPawnsToPlaceThisTurn(Math.min(2, PAWNS_PER_PLAYER));
+    });setPawnsToPlaceThisTurn(Math.min(2, PAWNS_PER_PLAYER));
     setIsCurrentPlayerOnInitialTwoPawnTurn(true); 
     
     toast({ 
@@ -233,22 +249,22 @@ const NinePebblesPage: React.FC = () => {
         
         const remainingForThisActionSequence = pawnsToPlaceThisTurn - 1; 
         
-        setBoard(newBoard);
+        setBoard(newBoard); 
 
         if (checkMill(newBoard, currentPlayer, index)) {
           setPlayerStats(updatedPlayerStats); 
           setPawnsToPlaceThisTurn(remainingForThisActionSequence); 
           setGamePhase('removing');
         } else {
-          if (remainingForThisActionSequence === 0) { 
+          if (remainingForThisActionSequence === 0) {
             if (isCurrentPlayerOnInitialTwoPawnTurn) {
                  updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
             }
             setPlayerStats(updatedPlayerStats); 
             
-            let effectivePhaseForSwitch = gamePhase;
+            let effectivePhaseForSwitch = gamePhase; 
              if (updatedPlayerStats[1].pawnsToPlace === 0 && updatedPlayerStats[2].pawnsToPlace === 0) {
-                 effectivePhaseForSwitch = 'movement';
+                 // This check is also inside executeSwitchPlayerAndPhase, but setting context here is clearer
              }
             executeSwitchPlayerAndPhase(effectivePhaseForSwitch, updatedPlayerStats);
           } else {
@@ -259,7 +275,7 @@ const NinePebblesPage: React.FC = () => {
       } else if (newBoard[index] !== null) {
         toast({ title: "Invalid Placement", description: "This position is already occupied.", variant: "destructive" });
       } else if (pawnsToPlaceThisTurn === 0 || updatedPlayerStats[currentPlayer].pawnsToPlace === 0) {
-         toast({ title: "No Pawns to Place", description: "You have no more pawns for this turn or overall.", variant: "default" });
+         toast({ title: "Placement Limit Reached", description: `You have no more pawns for this turn or have placed all ${PAWNS_PER_PLAYER} pawns.`, variant: "default" });
       }
     } else if (gamePhase === 'movement') {
       if (selectedPawnIndex === null) {
@@ -284,13 +300,14 @@ const NinePebblesPage: React.FC = () => {
           setSelectedPawnIndex(null); 
           
           setTimeout(() => {
-            setBoard(newBoard);
+            setBoard(newBoard); 
             setMovingPawn(null); 
 
             if (checkMill(newBoard, currentPlayer, movedPawnIndex)) {
               setGamePhase('removing');
             } else {
               if (!checkWinCondition(newBoard, updatedPlayerStats)) { 
+
                 executeSwitchPlayerAndPhase(gamePhase, updatedPlayerStats); 
               }
             }
@@ -324,6 +341,7 @@ const NinePebblesPage: React.FC = () => {
             statsAfterRemoval[opponent].pawnsOnBoard -= 1;
 
             setBoard(boardAfterRemoval); 
+            setPlayerStats(statsAfterRemoval); 
             setPawnToRemoveIndex(null); 
 
             const gameWon = checkWinCondition(boardAfterRemoval, statsAfterRemoval); 
@@ -331,25 +349,18 @@ const NinePebblesPage: React.FC = () => {
             if (!gameWon) {
                 const stillInPlacementPhaseOverall = statsAfterRemoval[1].pawnsToPlace > 0 || statsAfterRemoval[2].pawnsToPlace > 0;
                 
-                if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) { 
-                    setPlayerStats(statsAfterRemoval); 
+                if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) {
                     setGamePhase('placement'); 
-                    updateMessageAndPawnsToPlace();
                 } else { 
-                    let finalStatsForThisTurn = JSON.parse(JSON.stringify(statsAfterRemoval));
-                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0 && !finalStatsForThisTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement) { 
-                        finalStatsForThisTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
+                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0 && !statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement) { 
+                       statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement = true; 
                     }
-                    setPlayerStats(finalStatsForThisTurn); 
-                    
-                    const nextPhaseAfterRemoval = stillInPlacementPhaseOverall ? 'placement' : 'movement';
-                    setGamePhase(nextPhaseAfterRemoval);
-                    updateMessageAndPawnsToPlace(); 
-                    executeSwitchPlayerAndPhase(nextPhaseAfterRemoval, finalStatsForThisTurn); 
+                    setGamePhase(stillInPlacementPhaseOverall ? 'placement' : 'movement');
                 }
+                updateMessageAndPawnsToPlace(); 
+                executeSwitchPlayerAndPhase(stillInPlacementPhaseOverall ? 'placement' : 'movement', statsAfterRemoval); 
             } else {
                  setPlayerStats(statsAfterRemoval); 
-                 updateMessageAndPawnsToPlace(); 
             }
         }, PAWN_REMOVAL_ANIMATION_DURATION);
 
@@ -417,6 +428,13 @@ const NinePebblesPage: React.FC = () => {
         </div>
       </header>
 
+      {/* Skeleton for GameBanner */}
+      <div className="w-full my-2 sm:my-3">
+        <div className="container mx-auto px-2 sm:px-0">
+          <Skeleton className="h-10 sm:h-12 w-full rounded-lg" />
+        </div>
+      </div>
+
       {/* Skeleton for CombinedPlayerStatusDisplay */}
       <div className="w-full max-w-md mx-auto mb-3 sm:mb-4">
         <div className="flex items-stretch justify-center gap-2 sm:gap-3">
@@ -467,6 +485,8 @@ const NinePebblesPage: React.FC = () => {
           <ThemeToggle />
         </div>
       </header>
+      
+      <GameBanner /> {/* Render the GameBanner component */}
 
       <CombinedPlayerStatusDisplay
         player1Stats={playerStats[1]}
@@ -483,7 +503,6 @@ const NinePebblesPage: React.FC = () => {
           <AlertTitle className={`text-2xl font-bold mb-2 ${winner === 1 ? 'text-primary' : 'text-destructive'}`}>
             {getPlayerThematicName(winner)} are victorious!
           </AlertTitle>
-          {/* <AlertDescription className="mb-4 text-base">{message}</AlertDescription> */}
           <Button 
             onClick={handleResetGame} 
             className={`text-base py-2.5 ${winner === 1 ? 'bg-gradient-to-r from-primary via-primary/80 to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground' : 'bg-gradient-to-r from-destructive via-destructive/80 to-accent hover:from-destructive/90 hover:to-accent/90 text-destructive-foreground'} shadow-lg hover:shadow-xl transition-all duration-200`}

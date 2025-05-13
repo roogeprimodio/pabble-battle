@@ -334,6 +334,7 @@ const NinePebblesPage: React.FC = () => {
             const gameWon = checkWinCondition(boardAfterRemoval, statsAfterRemoval); // Check win with updated board & stats
             if (!gameWon) {
                 const stillInPlacementPhaseOverall = statsAfterRemoval[1].pawnsToPlace > 0 || statsAfterRemoval[2].pawnsToPlace > 0;
+                setGamePhase('placement'); // Added this line
                 
                 // If the current player still has placements for THIS action sequence (e.g., formed mill on 1st of 2 placements)
                 if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) {
@@ -349,7 +350,6 @@ const NinePebblesPage: React.FC = () => {
                     setPlayerStats(statsAfterRemoval); // This is crucial
                     setGamePhase(stillInPlacementPhaseOverall ? 'placement' : 'movement');
                     switchPlayerAndPhase(); // Now switch player or move to movement phase.
-                    // Message will update due to useEffect
                 }
             } else {
                  setPlayerStats(statsAfterRemoval); // Ensure stats are updated on win

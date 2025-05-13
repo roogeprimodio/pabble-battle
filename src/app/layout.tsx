@@ -1,20 +1,21 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Changed from Geist_Sans to Inter
+import { Lora, Playfair_Display } from 'next/font/google'; // Changed fonts
 import './globals.css';
 import { ThemeProvider } from '@/app/(components)/ThemeProvider';
 import { Toaster } from '@/components/ui/toaster';
 
-const inter = Inter({ // Changed from Geist_Sans to Inter
-  variable: '--font-inter', // Changed variable name
+const lora = Lora({
+  variable: '--font-lora',
   subsets: ['latin'],
+  display: 'swap',
 });
 
-// Geist Mono is not explicitly requested, can be removed if not used.
-// For now, keep it as it was in the original scaffold.
-// const geistMono = Geist_Mono({
-//   variable: '--font-geist-mono',
-//   subsets: ['latin'],
-// });
+const playfairDisplay = Playfair_Display({
+  variable: '--font-playfair',
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['400', '700'],
+});
 
 export const metadata: Metadata = {
   title: 'Pebble Arena',
@@ -28,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased`}> {/* Updated to use inter.variable */}
+      <body className={`${lora.variable} ${playfairDisplay.variable} antialiased`}> {/* Updated font variables */}
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

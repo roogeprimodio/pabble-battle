@@ -12,8 +12,6 @@ export default function ChooseGamePage() {
       name: '9-Pebbles',
       description: 'A classic game of alignment and strategy. Form lines of three to capture opponent pieces.',
       href: '/games/nine-pebbles',
-      // imageSrc and imageAlt are no longer needed for 9-Pebbles if using preview
-      // aiHint can be kept if generic game searching is desired, or removed
     },
     // Future games can be added here
   ];
@@ -26,7 +24,7 @@ export default function ChooseGamePage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold text-primary">Choose Your Arena</h1>
+        <h1 className="text-3xl font-bold text-primary font-heading">Choose Your Arena</h1>
         <ThemeToggle />
       </header>
       
@@ -39,14 +37,13 @@ export default function ChooseGamePage() {
                   {game.name === '9-Pebbles' ? (
                     <NinePebblesBoardPreview />
                   ) : (
-                    // Fallback for other games or if specific preview isn't available
                     <div className="aspect-[16/10] bg-muted flex items-center justify-center rounded-t-lg">
                       <span className="text-muted-foreground text-sm">Game Preview Unavailable</span>
                     </div>
                   )}
                 </CardHeader>
                 <CardContent className="p-5 sm:p-6 flex-grow">
-                  <CardTitle className="text-xl sm:text-2xl mb-2 text-primary group-hover:text-primary/90 transition-colors">
+                  <CardTitle className="text-xl sm:text-2xl mb-2 text-primary group-hover:text-primary/90 transition-colors font-heading">
                     {game.name}
                   </CardTitle>
                   <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed">

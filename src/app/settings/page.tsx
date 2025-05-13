@@ -13,7 +13,7 @@ export default function SettingsPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold text-primary">Settings</h1>
+        <h1 className="text-3xl font-bold text-primary font-heading">Settings</h1>
         <ThemeToggle />
       </header>
       
@@ -23,7 +23,7 @@ export default function SettingsPage() {
             <div className="flex justify-center mb-4">
               <Construction className="h-16 w-16 text-accent" />
             </div>
-            <CardTitle className="text-2xl">Under Construction</CardTitle>
+            <CardTitle className="text-2xl font-heading">Under Construction</CardTitle>
           </CardHeader>
           <CardContent>
             <CardDescription className="text-lg">

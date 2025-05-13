@@ -22,12 +22,13 @@ import {
 } from '@/lib/nine-pebbles-rules';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type GamePhase = 'playerSelection' | 'placement' | 'movement' | 'removing' | 'gameOver';
 
 const NinePebblesPage: React.FC = () => {
   const [board, setBoard] = useState<GameBoardArray>(createInitialBoard());
-  const [currentPlayer, setCurrentPlayer] = useState<Player>(1); // Default, will be set by selection
+  const [currentPlayer, setCurrentPlayer] = useState<Player>(1);
   const [gamePhase, setGamePhase] = useState<GamePhase>('playerSelection');
   
   const [playerStats, setPlayerStats] = useState({
@@ -40,6 +41,15 @@ const NinePebblesPage: React.FC = () => {
   const [winner, setWinner] = useState<Player | null>(null);
   const [message, setMessage] = useState<string>('Choose which side will make the first move.');
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate loading delay for skeleton screen
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500); // Adjust delay as needed
+    return () => clearTimeout(timer);
+  }, []);
 
   const getPlayerThematicName = useCallback((player: Player | null) => {
     if (player === 1) return "Angels";
@@ -87,7 +97,6 @@ const NinePebblesPage: React.FC = () => {
     } else if (gamePhase === 'removing') {
       setMessage(`${currentPlayerName} formed a line of power! Banish an opposing pawn.`);
     }
-    // GameOver message is handled by the initial check in this function
   }, [gamePhase, currentPlayer, playerStats, winner, getPlayerThematicName]);
 
   useEffect(() => {
@@ -120,6 +129,7 @@ const NinePebblesPage: React.FC = () => {
 
 
   const handleResetGame = () => {
+    setIsLoading(true);
     setBoard(createInitialBoard());
     setGamePhase('playerSelection');
     setCurrentPlayer(1); 
@@ -131,6 +141,7 @@ const NinePebblesPage: React.FC = () => {
     setWinner(null);
     setPawnsToPlaceThisAction(0);
     toast({ title: "Game Reset", description: "The eternal battle begins anew. Choose your champion." });
+    setTimeout(() => setIsLoading(false), 500); // Short delay to show reset effect
   };
   
   const checkWinCondition = useCallback((updatedBoard: GameBoardArray, updatedPlayerStats: typeof playerStats) => {
@@ -181,6 +192,7 @@ const NinePebblesPage: React.FC = () => {
   
 
   const handlePlayerSelect = (player: Player) => {
+    setIsLoading(true);
     setCurrentPlayer(player);
     setGamePhase('placement');
     setPlayerStats({ 
@@ -191,6 +203,7 @@ const NinePebblesPage: React.FC = () => {
       title: "Battle Commences!", 
       description: `${getPlayerThematicName(player)} will lead the charge. Place 2 pawns.` 
     });
+    setTimeout(() => setIsLoading(false), 500);
   };
 
   const handlePointClick = (index: number) => {
@@ -279,46 +292,110 @@ const NinePebblesPage: React.FC = () => {
     }
   };
 
-  if (gamePhase === 'playerSelection') {
-    return (
-      <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
-        <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
-            <Link href="/choose-game" passHref>
-              <Button variant="outline" size="icon" aria-label="Back to Choose Game">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <ThemeToggle />
-        </header>
-        <Card className="w-full max-w-md shadow-2xl text-center animate-fadeIn">
-          <CardHeader className="p-4 sm:p-6">
-            <div className="flex justify-center mb-3">
-                <ShieldQuestion className="w-16 h-16 text-primary animate-pulse" />
-            </div>
-            <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Choose Who Starts</CardTitle>
+  const renderPlayerSelectionScreen = () => (
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
+      <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
+        <Link href="/choose-game" passHref>
+          <Button variant="outline" size="icon" aria-label="Back to Choose Game">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <ThemeToggle />
+      </header>
+      <Card className="w-full max-w-md shadow-2xl text-center animate-fadeIn">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex justify-center mb-3">
+            <ShieldQuestion className="w-16 h-16 text-primary animate-pulse" />
+          </div>
+          <CardTitle className="text-2xl sm:text-3xl font-bold text-primary font-heading">Choose Who Starts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+          <p className="text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base">The chosen side makes the first move and places 2 pawns.</p>
+          <Button 
+            onClick={() => handlePlayerSelect(1)} 
+            className="w-full text-base sm:text-lg py-2.5 sm:py-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-150 ease-out hover:scale-105 active:scale-95"
+          >
+            <PlayerPawnDisplay player={1} size="small" /> <span className="ml-2">Angels Start</span>
+          </Button>
+          <Button 
+            onClick={() => handlePlayerSelect(2)} 
+            className="w-full text-base sm:text-lg py-2.5 sm:py-3 bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg transition-all duration-150 ease-out hover:scale-105 active:scale-95"
+          >
+            <PlayerPawnDisplay player={2} size="small" /> <span className="ml-2">Demons Start</span>
+          </Button>
+        </CardContent>
+      </Card>
+      <footer className="text-center py-4 mt-6 text-sm text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} Pebble Arena</p>
+      </footer>
+    </div>
+  );
+
+  const renderGameScreenSkeleton = () => (
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
+      <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-3 sm:mb-4">
+        <Link href="/choose-game" passHref>
+          <Button variant="outline" size="icon" aria-label="Back to Choose Game">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center flex items-center gap-2 font-heading">
+          <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> 9-Pebbles <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+        </h1>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" aria-label="Reset Game" disabled>
+            <RotateCcw className="h-5 w-5" />
+          </Button>
+          <ThemeToggle />
+        </div>
+      </header>
+      <main className="flex-grow flex flex-col lg:flex-row items-center lg:items-start justify-center gap-3 sm:gap-4 lg:gap-6">
+        <div className="w-full max-w-[calc(100vw-20px)] sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
+          <Skeleton className="w-full h-full rounded-lg" />
+        </div>
+        <Card className="w-full lg:max-w-xs xl:max-w-sm shadow-lg mt-3 lg:mt-0 shrink-0">
+          <CardHeader className="p-4 sm:p-5">
+            <CardTitle className="text-lg sm:text-xl text-center text-primary font-heading">Battle Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
-            <p className="text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base">The chosen side makes the first move and places 2 pawns.</p>
-            <Button 
-              onClick={() => handlePlayerSelect(1)} 
-              className="w-full text-base sm:text-lg py-2.5 sm:py-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-150 ease-out hover:scale-105 active:scale-95"
-            >
-              <PlayerPawnDisplay player={1} size="small" /> <span className="ml-2">Angels Start</span>
-            </Button>
-            <Button 
-              onClick={() => handlePlayerSelect(2)} 
-              className="w-full text-base sm:text-lg py-2.5 sm:py-3 bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg transition-all duration-150 ease-out hover:scale-105 active:scale-95"
-            >
-              <PlayerPawnDisplay player={2} size="small" /> <span className="ml-2">Demons Start</span>
-            </Button>
+          <CardContent className="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
+            <Alert variant="default" className="bg-card text-xs sm:text-sm">
+              <Info className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              <AlertTitle className="font-semibold text-sm sm:text-base">
+                <Skeleton className="h-5 w-2/3" />
+              </AlertTitle>
+              <Skeleton className="h-4 w-full mt-1" />
+              <Skeleton className="h-4 w-3/4 mt-1" />
+            </Alert>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+              {[1, 2].map(p => (
+                <div key={p} className={`p-2.5 rounded-md bg-primary/10 border border-primary/30`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="w-7 h-7 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-20 mb-1" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-10 w-full mt-3" />
           </CardContent>
         </Card>
-        <footer className="text-center py-4 mt-6 text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Pebble Arena</p>
-        </footer>
-      </div>
-    );
+      </main>
+      <footer className="text-center py-4 mt-auto text-sm text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} Pebble Arena</p>
+      </footer>
+    </div>
+  );
+
+  if (gamePhase === 'playerSelection' && !isLoading) { // Only show player selection if not initial loading
+    return renderPlayerSelectionScreen();
   }
+  
+  if (isLoading) {
+     return renderGameScreenSkeleton();
+  }
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
@@ -328,7 +405,7 @@ const NinePebblesPage: React.FC = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center flex items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center flex items-center gap-2 font-heading">
           <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent" /> 9-Pebbles <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
         </h1>
         <div className="flex items-center gap-2">
@@ -353,14 +430,14 @@ const NinePebblesPage: React.FC = () => {
 
         <Card className="w-full lg:max-w-xs xl:max-w-sm shadow-lg mt-3 lg:mt-0 shrink-0">
           <CardHeader className="p-4 sm:p-5">
-            <CardTitle className="text-lg sm:text-xl text-center text-primary">Battle Status</CardTitle>
+            <CardTitle className="text-lg sm:text-xl text-center text-primary font-heading">Battle Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
              <Alert variant={winner ? (winner === currentPlayer ? "default" : "destructive") : "default"} className={`${
                 currentPlayer === 1 ? 'border-primary/50' : 'border-accent/50'
               } bg-card text-xs sm:text-sm`}>
               <Info className={`h-4 w-4 sm:h-5 sm:w-5 ${currentPlayer === 1 ? 'text-primary' : 'text-accent'}`} />
-              <AlertTitle className="font-semibold text-sm sm:text-base">
+              <AlertTitle className="font-semibold text-sm sm:text-base font-heading">
                 {winner ? `Battle Over!` : `${getPlayerThematicName(currentPlayer)}'s Turn`}
               </AlertTitle>
               <AlertDescription>{message}</AlertDescription>
@@ -369,7 +446,7 @@ const NinePebblesPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                 <div className={`p-2.5 rounded-md bg-primary/10 border border-primary/30 ${currentPlayer === 1 && !winner ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''}`}>
                     <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-semibold text-primary">{getPlayerThematicName(1)}</span>
+                        <span className="font-semibold text-primary font-heading">{getPlayerThematicName(1)}</span>
                         <PlayerPawnDisplay player={1} size="small" />
                     </div>
                     <p>To Place: <span className="font-bold">{playerStats[1].pawnsToPlace}</span></p>
@@ -377,7 +454,7 @@ const NinePebblesPage: React.FC = () => {
                 </div>
                 <div className={`p-2.5 rounded-md bg-accent/10 border border-accent/30 ${currentPlayer === 2 && !winner ? 'ring-2 ring-accent ring-offset-1 ring-offset-background' : ''}`}>
                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-semibold text-accent">{getPlayerThematicName(2)}</span>
+                        <span className="font-semibold text-accent font-heading">{getPlayerThematicName(2)}</span>
                         <PlayerPawnDisplay player={2} size="small" />
                     </div>
                     <p>To Place: <span className="font-bold">{playerStats[2].pawnsToPlace}</span></p>

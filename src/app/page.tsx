@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Gamepad2, SettingsIcon } from 'lucide-react'; // Removed Palette, not used for main options
+import { Gamepad2, SettingsIcon } from 'lucide-react';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 
 export default function HomePage() {
@@ -22,7 +22,7 @@ export default function HomePage() {
               <circle cx="50" cy="65" r="8" fill="hsl(var(--background))" />
             </svg>
           </div>
-          <CardTitle className="text-4xl font-bold tracking-tight text-primary">Pebble Arena</CardTitle>
+          <CardTitle className="text-4xl font-bold tracking-tight text-primary font-heading">Pebble Arena</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col space-y-4 p-6">
           <Link href="/choose-game" passHref>

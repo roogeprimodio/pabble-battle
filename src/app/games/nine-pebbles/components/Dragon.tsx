@@ -60,10 +60,10 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
   useEffect(() => {
     if (isMoving && animationDuration > 0) {
       const turnSeverity = Math.min(1, Math.abs(turnDeltaAngleRef.current) / 90); 
-      // Reduced base amplitude and turn influence to reduce flicker
-      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (0.5 + turnSeverity * 0.15); 
-      // Reduced max segment rotation, especially the turn-based addition
-      const dynamicMaxSegmentRotation = 10 + turnSeverity * 10; 
+      // Further reduced base amplitude and turn influence to reduce flicker
+      const dynamicWindingAmplitudeBase = bodySegmentBaseWidth * (0.25 + turnSeverity * 0.1); 
+      // Further reduced max segment rotation, especially the turn-based addition
+      const dynamicMaxSegmentRotation = 5 + turnSeverity * 5; 
 
       const animateWinding = (timestamp: number) => {
         if (startTimeRef.current === null) {
@@ -77,16 +77,16 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
           const newSegmentStyles = segmentStyles.map((_, i) => {
             if (i === 0) return segmentStyles[0]; 
             
-            const amplitudeFactor = 1 + (i / segmentCount) * 0.5; // Keep some variation along the body
+            const amplitudeFactor = 1 + (i / segmentCount) * 0.3; // Reduced variation along body
             const movementPhaseAmplitudeFactor = Math.sin(progress * Math.PI); 
             
-            const sWaveDampening = 1 - (turnSeverity * 0.7); // Slightly increased dampening during turns
+            const sWaveDampening = 1 - (turnSeverity * 0.8); // Increased dampening during turns
 
             const currentAmplitude = dynamicWindingAmplitudeBase * amplitudeFactor * movementPhaseAmplitudeFactor * sWaveDampening;
             
-            const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.8; 
-            // Reduced wave frequency to make S-wave slower
-            const waveAngle = 1.5 * easedProgress * 2 * Math.PI;  
+            const phaseShift = (Math.PI / (segmentCount -1)) * i * 0.7; 
+            // Further reduced wave frequency to make S-wave slower and smoother
+            const waveAngle = 1.0 * easedProgress * 2 * Math.PI;  
             
             const offsetY = currentAmplitude * Math.sin(waveAngle + phaseShift);
             
@@ -96,12 +96,14 @@ const Dragon: React.FC<DragonProps> = ({ currentPos, targetPos, isMoving, animat
             let segmentOverallBendRotation = 0;
             if (Math.abs(turnDeltaAngleRef.current) > 1) { 
               const bendInfluenceFactor = (1 - Math.pow(i / (segmentCount + 1), 0.5));
-              segmentOverallBendRotation = (turnDeltaAngleRef.current * bendInfluenceFactor * 0.50) * Math.sin(progress * Math.PI);
+              // Further reduced bend influence for smoother turns
+              segmentOverallBendRotation = (turnDeltaAngleRef.current * bendInfluenceFactor * 0.40) * Math.sin(progress * Math.PI);
             }
             
             const finalSegmentRotation = baseSegmentWaveRotation + segmentOverallBendRotation;
 
-            const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.05 * (i/segmentCount) * movementPhaseAmplitudeFactor; // Reduced length variation
+            // Further reduced length variation
+            const dynamicLengthFactor = 0.55 - Math.sin(waveAngle + phaseShift) * 0.02 * (i/segmentCount) * movementPhaseAmplitudeFactor; 
 
             return {
               transform: `translateX(${-i * bodySegmentBaseLength * dynamicLengthFactor}px) translateY(${offsetY}px) rotate(${finalSegmentRotation}deg)`,

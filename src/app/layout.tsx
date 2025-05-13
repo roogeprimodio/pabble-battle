@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Geist_Sans } from 'next/font/google'; // Corrected import
+import { Inter } from 'next/font/google'; // Changed from Geist_Sans to Inter
 import './globals.css';
 import { ThemeProvider } from '@/app/(components)/ThemeProvider';
 import { Toaster } from '@/components/ui/toaster';
 
-const geistSans = Geist_Sans({ // Corrected usage
-  variable: '--font-geist-sans',
+const inter = Inter({ // Changed from Geist_Sans to Inter
+  variable: '--font-inter', // Changed variable name
   subsets: ['latin'],
 });
 
@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} antialiased`}>
+      <body className={`${inter.variable} antialiased`}> {/* Updated to use inter.variable */}
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -1,9 +1,10 @@
+
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
+import NinePebblesBoardPreview from './components/NinePebblesBoardPreview';
 
 export default function ChooseGamePage() {
   const games = [
@@ -11,9 +12,8 @@ export default function ChooseGamePage() {
       name: '9-Pebbles',
       description: 'A classic game of alignment and strategy. Form lines of three to capture opponent pieces.',
       href: '/games/nine-pebbles',
-      imageSrc: 'https://picsum.photos/seed/9pebbles/400/250',
-      imageAlt: '9-Pebbles game board',
-      aiHint: 'abstract strategy'
+      // imageSrc and imageAlt are no longer needed for 9-Pebbles if using preview
+      // aiHint can be kept if generic game searching is desired, or removed
     },
     // Future games can be added here
   ];
@@ -31,36 +31,36 @@ export default function ChooseGamePage() {
       </header>
       
       <main className="flex-grow flex items-center justify-center">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 max-w-6xl w-full p-4">
           {games.map((game) => (
-            <Card key={game.name} className="hover:shadow-xl transition-shadow duration-300 group overflow-hidden flex flex-col">
-              <CardHeader className="p-0">
-                <div className="aspect-[16/10] overflow-hidden">
-                  <Image
-                    src={game.imageSrc}
-                    alt={game.imageAlt}
-                    width={400}
-                    height={250}
-                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                    data-ai-hint={game.aiHint}
-                  />
+            <Link key={game.name} href={game.href} passHref className="block h-full">
+              <Card className="hover:shadow-2xl transition-all duration-300 ease-in-out group flex flex-col h-full overflow-hidden cursor-pointer ring-1 ring-transparent hover:ring-primary/30 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none">
+                <CardHeader className="p-0">
+                  {game.name === '9-Pebbles' ? (
+                    <NinePebblesBoardPreview />
+                  ) : (
+                    // Fallback for other games or if specific preview isn't available
+                    <div className="aspect-[16/10] bg-muted flex items-center justify-center rounded-t-lg">
+                      <span className="text-muted-foreground text-sm">Game Preview Unavailable</span>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="p-5 sm:p-6 flex-grow">
+                  <CardTitle className="text-xl sm:text-2xl mb-2 text-primary group-hover:text-primary/90 transition-colors">
+                    {game.name}
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+                    {game.description}
+                  </CardDescription>
+                </CardContent>
+                <div className="p-5 pt-0 sm:p-6 sm:pt-0 mt-auto">
+                  <div className="flex items-center text-sm font-medium text-primary group-hover:text-primary/90 transition-colors">
+                    Enter Arena
+                    <ChevronRight className="ml-1.5 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200 ease-in-out" />
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 flex-grow">
-                <CardTitle className="text-2xl mb-2 text-primary">{game.name}</CardTitle>
-                <CardDescription className="text-muted-foreground text-sm leading-relaxed">
-                  {game.description}
-                </CardDescription>
-              </CardContent>
-              <CardFooter className="p-6 pt-0">
-                <Link href={game.href} passHref className="w-full">
-                  <Button variant="default" className="w-full text-lg py-3 shadow-md hover:shadow-lg transition-shadow">
-                    Play Now
-                    <ChevronRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
+              </Card>
+            </Link>
           ))}
           {games.length === 0 && (
             <p className="text-center text-muted-foreground col-span-full">No games available at the moment. Check back soon!</p>

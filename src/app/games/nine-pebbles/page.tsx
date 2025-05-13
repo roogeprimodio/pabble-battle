@@ -9,7 +9,7 @@ import { ArrowLeft, RotateCcw, Info, Swords, Zap, ShieldQuestion, Sparkles, Skul
 import { useToast } from '@/hooks/use-toast';
 import GameBoardDisplay from './components/GameBoard';
 import PlayerPawnDisplay from './components/Pawn';
-import PlayerStatusDisplay from './components/PlayerStatusDisplay';
+import CombinedPlayerStatusDisplay from './components/PlayerStatusDisplay';
 import {
   TOTAL_POINTS,
   PAWNS_PER_PLAYER,
@@ -53,7 +53,7 @@ const NinePebblesPage: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1000); // Reduced skeleton loading time
+    }, 1000); 
     return () => clearTimeout(timer);
   }, []);
 
@@ -66,30 +66,28 @@ const NinePebblesPage: React.FC = () => {
 
   const executeSwitchPlayerAndPhase = useCallback((currentPhaseForLogic: GamePhase, effectivePlayerStats: typeof playerStats) => {
     const nextPlayer = currentPlayer === 1 ? 2 : 1;
-    let nextPhase = currentPhaseForLogic; // Start with the current phase
+    let nextPhase = currentPhaseForLogic;
 
-    // Determine if placement is fully complete for both players
     const allPawnsPlacedByBoth = effectivePlayerStats[1].pawnsToPlace === 0 && effectivePlayerStats[2].pawnsToPlace === 0;
 
     if (allPawnsPlacedByBoth && currentPhaseForLogic === 'placement') {
-        nextPhase = 'movement'; // Transition to movement phase
+        nextPhase = 'movement';
         setPawnsToPlaceThisTurn(0);
         setIsCurrentPlayerOnInitialTwoPawnTurn(false);
-    } else if (currentPhaseForLogic === 'placement') { // Still in placement phase
+    } else if (currentPhaseForLogic === 'placement') { 
         let numToPlaceForNextPlayerTurn = 1;
         let nextPlayerIsOnInitialTurn = false;
         if (!effectivePlayerStats[nextPlayer].hasCompletedInitialTwoPawnPlacement && effectivePlayerStats[nextPlayer].pawnsToPlace > 0) {
             numToPlaceForNextPlayerTurn = 2;
             nextPlayerIsOnInitialTurn = true;
         }
-        // Ensure the player doesn't place more than they have left
         const actualCanPlaceNext = Math.min(numToPlaceForNextPlayerTurn, effectivePlayerStats[nextPlayer].pawnsToPlace);
         setPawnsToPlaceThisTurn(actualCanPlaceNext);
         setIsCurrentPlayerOnInitialTwoPawnTurn(nextPlayerIsOnInitialTurn && actualCanPlaceNext === 2);
     }
     
-    setGamePhase(nextPhase); // Update the game phase
-    setCurrentPlayer(nextPlayer); // Switch player
+    setGamePhase(nextPhase);
+    setCurrentPlayer(nextPlayer);
 }, [currentPlayer]);
 
 
@@ -113,16 +111,15 @@ const NinePebblesPage: React.FC = () => {
       if (pawnsToPlaceThisTurn > 0 && playerStats[currentPlayer].pawnsToPlace > 0) {
         setMessage(`${currentPlayerName}'s turn. Place ${pawnsToPlaceThisTurn} pawn${pawnsToPlaceThisTurn > 1 ? 's' : ''}.`);
       } else if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
-         setMessage("All pawns placed. Movement phase commencing.");
+         setMessage("All pawns placed. Movement phase starting.");
       } else {
-         // This case should ideally not be hit if logic is correct, or means turn switch pending
-         setMessage(`${currentPlayerName}'s turn is processing or pawns are exhausted.`);
+         setMessage(`${currentPlayerName}'s turn is processing.`);
       }
     } else if (gamePhase === 'movement') {
       setMessage(`${currentPlayerName}'s turn. Select a pawn to move.`);
     } else if (gamePhase === 'removing') {
-      const icon = currentPlayer === 1 ? <Sparkles className="inline-block h-5 w-5 text-yellow-400 animate-pulse" /> : <Skull className="inline-block h-5 w-5 text-red-500 animate-pulse" />;
-      setMessage(<span>{icon} {currentPlayerName} formed a line of power! Banish an opposing pawn.</span>);
+      const icon = currentPlayer === 1 ? <Sparkles className="inline-block h-4 w-4 text-yellow-400" /> : <Skull className="inline-block h-4 w-4 text-red-500" />;
+      setMessage(<span>{icon} {currentPlayerName} formed a mill! Banish an opposing pawn.</span>);
     }
   }, [gamePhase, currentPlayer, playerStats, winner, getPlayerThematicName, pawnsToPlaceThisTurn]);
 
@@ -347,12 +344,12 @@ const NinePebblesPage: React.FC = () => {
                     
                     const nextPhaseAfterRemoval = stillInPlacementPhaseOverall ? 'placement' : 'movement';
                     setGamePhase(nextPhaseAfterRemoval);
-                    updateMessageAndPawnsToPlace(); // Update message before switching player
+                    updateMessageAndPawnsToPlace(); 
                     executeSwitchPlayerAndPhase(nextPhaseAfterRemoval, finalStatsForThisTurn); 
                 }
             } else {
                  setPlayerStats(statsAfterRemoval); 
-                 updateMessageAndPawnsToPlace(); // Update message for win
+                 updateMessageAndPawnsToPlace(); 
             }
         }, PAWN_REMOVAL_ANIMATION_DURATION);
 
@@ -420,40 +417,21 @@ const NinePebblesPage: React.FC = () => {
         </div>
       </header>
 
-      <Alert variant="default" className="w-full max-w-xs sm:max-w-sm mx-auto mb-2 sm:mb-3 rounded-xl shadow-lg bg-card">
-        <Info className="h-4 w-4 text-primary" />
-        <AlertTitle className="font-semibold text-xs">
-          <Skeleton className="h-4 w-1/3" />
-        </AlertTitle>
-        <Skeleton className="h-3 w-full mt-1" />
-      </Alert>
+      {/* Skeleton for CombinedPlayerStatusDisplay */}
+      <div className="w-full max-w-md mx-auto mb-3 sm:mb-4">
+        <div className="flex items-stretch justify-center gap-2 sm:gap-3">
+          <Skeleton className="h-[70px] sm:h-[80px] flex-1 rounded-lg" />
+          <div className="flex flex-col items-center justify-center p-1">
+            <Skeleton className="w-5 h-5 sm:w-6 sm:w-6 rounded-full" />
+          </div>
+          <Skeleton className="h-[70px] sm:h-[80px] flex-1 rounded-lg" />
+        </div>
+        <Skeleton className="h-6 w-3/4 mx-auto mt-2 rounded-md" />
+      </div>
       
-      <main className="flex-grow w-full flex flex-col md:flex-row items-center md:items-start md:justify-between gap-3 sm:gap-4 lg:gap-6">
-        <div className="w-full md:w-auto order-1 md:order-1">
-          <Card className="p-3 rounded-lg border bg-card shadow-md min-w-[150px] md:min-w-[180px]">
-            <div className="flex items-center justify-between mb-1.5">
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="w-7 h-7 rounded-full" />
-            </div>
-            <Skeleton className="h-4 w-20 mb-1" />
-            <Skeleton className="h-4 w-20" />
-          </Card>
-        </div>
-
-
-        <div className="w-full md:flex-grow order-3 md:order-2 max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
+      <main className="flex-grow w-full flex flex-col items-center justify-center">
+        <div className="w-full max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
           <Skeleton className="w-full h-full rounded-lg" />
-        </div>
-
-        <div className="w-full md:w-auto order-2 md:order-3">
-           <Card className="p-3 rounded-lg border bg-card shadow-md min-w-[150px] md:min-w-[180px]">
-            <div className="flex items-center justify-between mb-1.5">
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="w-7 h-7 rounded-full" />
-            </div>
-            <Skeleton className="h-4 w-20 mb-1" />
-            <Skeleton className="h-4 w-20" />
-          </Card>
         </div>
       </main>
       <footer className="text-center py-4 mt-auto text-sm text-muted-foreground">
@@ -490,41 +468,22 @@ const NinePebblesPage: React.FC = () => {
         </div>
       </header>
 
-      {!winner && (
-         <Alert
-            variant={(currentPlayer === 2 && !winner) ? 'destructive' : 'default'}
-            className={`
-              w-full max-w-xs sm:max-w-sm mx-auto mb-2 sm:mb-3
-              rounded-xl shadow-lg
-              ${(currentPlayer === 2 && !winner) 
-                ? 'border-destructive/50 bg-destructive/10' 
-                : 'border-primary/50 bg-primary/10'}
-            `}
-          >
-            <Info className={`h-4 w-4 ${(currentPlayer === 2 && !winner) ? 'text-destructive' : 'text-primary'}`} />
-            <AlertTitle 
-              className={`font-semibold text-xs font-heading ${
-                (currentPlayer === 2 && !winner) ? 'text-destructive' : 'text-primary'
-              }`}
-            >
-                {gamePhase === 'animatingRemoval' || gamePhase === 'removing' ? 'Mill Formed!' : `${getPlayerThematicName(currentPlayer)}'s Turn`}
-            </AlertTitle>
-            <AlertDescription 
-              className={`text-xs min-h-[1.2em] ${
-                (currentPlayer === 2 && !winner) ? 'text-destructive/90' : 'text-primary/90'
-              }`}
-            >
-              {message}
-            </AlertDescription>
-          </Alert>
-      )}
+      <CombinedPlayerStatusDisplay
+        player1Stats={playerStats[1]}
+        player2Stats={playerStats[2]}
+        player1Name={getPlayerThematicName(1)}
+        player2Name={getPlayerThematicName(2)}
+        currentPlayer={currentPlayer}
+        winner={winner}
+        message={message}
+      />
 
       {winner && (
         <div className="w-full text-center my-4 p-4 rounded-lg shadow-lg bg-card">
           <AlertTitle className={`text-2xl font-bold mb-2 ${winner === 1 ? 'text-primary' : 'text-destructive'}`}>
             {getPlayerThematicName(winner)} are victorious!
           </AlertTitle>
-          <AlertDescription className="mb-4 text-base">{message}</AlertDescription>
+          {/* <AlertDescription className="mb-4 text-base">{message}</AlertDescription> */}
           <Button 
             onClick={handleResetGame} 
             className={`text-base py-2.5 ${winner === 1 ? 'bg-gradient-to-r from-primary via-primary/80 to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground' : 'bg-gradient-to-r from-destructive via-destructive/80 to-accent hover:from-destructive/90 hover:to-accent/90 text-destructive-foreground'} shadow-lg hover:shadow-xl transition-all duration-200`}
@@ -534,21 +493,8 @@ const NinePebblesPage: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-grow w-full flex flex-col md:flex-row items-center md:items-start md:justify-center gap-3 sm:gap-4 lg:gap-6 relative">
-        {/* Player 1 Status - Positioned on Left for md screens, top-left for sm */}
-        <div className="w-full md:w-auto order-1 md:absolute md:left-0 md:top-0 md:h-full md:flex md:items-center">
-           <PlayerStatusDisplay
-            player={1}
-            playerName={getPlayerThematicName(1)}
-            pawnsToPlace={playerStats[1].pawnsToPlace}
-            pawnsOnBoard={playerStats[1].pawnsOnBoard}
-            isCurrentPlayer={currentPlayer === 1}
-            winner={winner}
-          />
-        </div>
-        
-        {/* Game Board - Centered */}
-        <div className="w-full md:flex-grow-0 order-3 md:order-2 max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center mx-auto">
+      <main className="flex-grow w-full flex flex-col items-center justify-center">
+        <div className="w-full max-w-[calc(100vw-20px)] sm:max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl aspect-square relative self-center">
           <GameBoardDisplay
             board={board}
             onPointClick={handlePointClick}
@@ -558,18 +504,6 @@ const NinePebblesPage: React.FC = () => {
             winner={winner}
             pawnToRemoveIndex={pawnToRemoveIndex}
             movingPawn={movingPawn}
-          />
-        </div>
-
-        {/* Player 2 Status - Positioned on Right for md screens, top-right for sm */}
-        <div className="w-full md:w-auto order-2 md:absolute md:right-0 md:top-0 md:h-full md:flex md:items-center">
-           <PlayerStatusDisplay
-            player={2}
-            playerName={getPlayerThematicName(2)}
-            pawnsToPlace={playerStats[2].pawnsToPlace}
-            pawnsOnBoard={playerStats[2].pawnsOnBoard}
-            isCurrentPlayer={currentPlayer === 2}
-            winner={winner}
           />
         </div>
       </main>

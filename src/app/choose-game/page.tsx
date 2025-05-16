@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 import NinePebblesBoardPreview from './components/NinePebblesBoardPreview';
+import TicTacToeBoardPreview from './components/TicTacToeBoardPreview'; // Import new preview
 
 export default function ChooseGamePage() {
   const games = [
@@ -12,6 +13,13 @@ export default function ChooseGamePage() {
       name: '9-Pebbles',
       description: 'A classic game of alignment and strategy. Form lines of three to capture opponent pieces.',
       href: '/games/nine-pebbles',
+      previewComponent: <NinePebblesBoardPreview />,
+    },
+    {
+      name: 'Tic-Tac-Toe',
+      description: 'The timeless game of X\'s and O\'s. Align three of your marks to win before your opponent does.',
+      href: '/games/tic-tac-toe',
+      previewComponent: <TicTacToeBoardPreview />,
     },
     // Future games can be added here
   ];
@@ -34,8 +42,8 @@ export default function ChooseGamePage() {
             <Link key={game.name} href={game.href} passHref className="block h-full">
               <Card className="hover:shadow-2xl transition-all duration-300 ease-in-out group flex flex-col h-full overflow-hidden cursor-pointer ring-1 ring-transparent hover:ring-primary/30 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none">
                 <CardHeader className="p-0">
-                  {game.name === '9-Pebbles' ? (
-                    <NinePebblesBoardPreview />
+                  {game.previewComponent ? (
+                    game.previewComponent
                   ) : (
                     <div className="aspect-[16/10] bg-muted flex items-center justify-center rounded-t-lg">
                       <span className="text-muted-foreground text-sm">Game Preview Unavailable</span>

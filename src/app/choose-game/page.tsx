@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 import NinePebblesBoardPreview from './components/NinePebblesBoardPreview';
-import TicTacToeBoardPreview from './components/TicTacToeBoardPreview'; // Import new preview
+import TicTacToeBoardPreview from './components/TicTacToeBoardPreview';
+import SoulShardsBoardPreview from '../games/soul-shards/components/SoulShardsBoardPreview'; // New Preview
 
 export default function ChooseGamePage() {
   const games = [
@@ -20,6 +21,12 @@ export default function ChooseGamePage() {
       description: 'The timeless game of X\'s and O\'s. Align three of your marks to win before your opponent does.',
       href: '/games/tic-tac-toe',
       previewComponent: <TicTacToeBoardPreview />,
+    },
+    {
+      name: 'Soul Shards',
+      description: 'A strategic battle for mystical Soul Shards. Deploy units, manage resources, and outwit your foe. (Under Development)',
+      href: '/games/soul-shards',
+      previewComponent: <SoulShardsBoardPreview />,
     },
     // Future games can be added here
   ];

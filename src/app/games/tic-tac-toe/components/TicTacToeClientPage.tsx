@@ -1,3 +1,4 @@
+
 // src/app/games/tic-tac-toe/components/TicTacToeClientPage.tsx
 "use client";
 
@@ -6,7 +7,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, RotateCcw, Swords, Zap, Sparkles, Copy, Users } from 'lucide-react'; // Removed AlertCircle as it wasn't used
+import { ArrowLeft, RotateCcw, Swords, Zap, Sparkles, Copy, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import TicTacToeBoard from './TicTacToeBoard';
 import TicTacToeStatus from './TicTacToeStatus';
@@ -50,9 +51,9 @@ const TicTacToeClientPage: React.FC = () => {
   const [inputRoomId, setInputRoomId] = useState<string>('');
   
   const [message, setMessage] = useState<string>('Create or join a game room.');
-  const [isLoading, setIsLoading] = useState(true); // Set to true initially
+  const [isLoading, setIsLoading] = useState(true);
 
-  const signalingUrl = '/.netlify/functions/signaling';
+  const signalingUrl = '/.netlify/functions/signaling'; // Relative path to Netlify function
 
   const initializePeerConnection = useCallback(async (isInitiator: boolean) => {
     if (!roomId || !localPlayer) {
@@ -63,7 +64,7 @@ const TicTacToeClientPage: React.FC = () => {
 
     const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     if (peerConnection) {
-        peerConnection.close(); // Close any existing connection
+        peerConnection.close(); 
     }
     peerConnection = new RTCPeerConnection(configuration);
 
@@ -77,6 +78,7 @@ const TicTacToeClientPage: React.FC = () => {
           });
         } catch (error) {
           console.error("Error sending ICE candidate:", error);
+          toast({ title: "Signaling Error", description: "Could not send network candidate.", variant: "destructive" });
         }
       }
     };
@@ -84,13 +86,14 @@ const TicTacToeClientPage: React.FC = () => {
     peerConnection.onconnectionstatechange = () => {
       if (peerConnection) {
         console.log("Peer connection state:", peerConnection.connectionState);
-        if (peerConnection.connectionState === 'connected' && pagePhase === 'waitingForOpponent') {
-          setPagePhase('playing');
+        if (peerConnection.connectionState === 'connected' && (pagePhase === 'waitingForOpponent' || pagePhase === 'playing')) {
+          setPagePhase('playing'); // Ensure it transitions fully
           toast({title: "Opponent Connected!", description: "The game can now begin."});
         }
         if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
            toast({title: "Connection Issue", description: "Lost connection to opponent.", variant: "destructive"});
-           // Potentially reset or show an error
+           // Optionally, you could reset the game or try to re-establish.
+           // For now, we'll just show a toast.
         }
       }
     };
@@ -118,11 +121,12 @@ const TicTacToeClientPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Error creating or sending offer:", error);
+        toast({ title: "Signaling Error", description: "Could not create or send offer.", variant: "destructive" });
       }
     }
-  }, [roomId, localPlayer, signalingUrl, pagePhase, toast]);
+  }, [roomId, localPlayer, signalingUrl, pagePhase, toast]); // Added pagePhase and toast
 
-  const setupDataChannelEvents = () => {
+  const setupDataChannelEvents = useCallback(() => { // Wrapped in useCallback
     if (!dataChannel) return;
     dataChannel.onopen = () => {
       console.log('Data channel OPEN');
@@ -142,15 +146,15 @@ const TicTacToeClientPage: React.FC = () => {
         if (receivedData.type === 'move') {
           handleOpponentMove(receivedData.board, receivedData.currentPlayer);
         } else if (receivedData.type === 'reset') {
-           handleResetGame(false); 
+           handleResetGame(false); // false means don't notify opponent, they initiated
            toast({ title: "Opponent Reset Game", description: "The game has been reset." });
         }
       } catch(e) {
         console.error("Failed to parse data channel message", e);
       }
     };
-  };
-  
+  }, [dataChannel, pagePhase, localPlayer, toast]); // Added dependencies for setupDataChannelEvents
+
   const handleSignalingMessage = useCallback(async (data: any) => {
     if (!peerConnection || !roomId || !localPlayer) {
       console.warn("Cannot handle signaling message without peerConnection, roomId, or localPlayer");
@@ -158,43 +162,46 @@ const TicTacToeClientPage: React.FC = () => {
     }
 
     console.log('Received signaling data:', data);
-    // Ensure we don't process signals sent by ourselves, which can happen with simple polling
     if (data.senderId && data.senderId === localPlayer.toString()) {
         console.log("Ignoring signal from self");
         return;
     }
 
     try {
-      if (data.type === 'offer') {
-          if (peerConnection.signalingState !== "stable" && peerConnection.signalingState !== "have-local-offer") {
-             console.warn(`Cannot set remote offer in state ${peerConnection.signalingState}. Resetting connection might be needed.`);
-             // Potentially handle this more gracefully, e.g., by ignoring or re-initiating.
-             return;
+      if (data.type === 'offer' && data.payload) {
+          // Only set remote description if we are the receiver and it's a valid offer
+          if (peerConnection.signalingState === "stable" || peerConnection.signalingState === "have-local-pranswer" || peerConnection.signalingState === "have-remote-pranswer") {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            console.log('Sending answer:', answer);
+            await fetch(signalingUrl, {
+                method: 'POST',
+                body: JSON.stringify({ type: 'answer', roomId, payload: answer, senderId: localPlayer.toString() }),
+            });
+          } else {
+            console.warn(`Cannot set remote offer in state ${peerConnection.signalingState}. Current localPlayer: ${localPlayer}`);
           }
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          console.log('Sending answer:', answer);
-          await fetch(signalingUrl, {
-              method: 'POST',
-              body: JSON.stringify({ type: 'answer', roomId, payload: answer, senderId: localPlayer.toString() }),
-          });
-      } else if (data.type === 'answer') {
-          if (peerConnection.signalingState !== "have-local-offer") {
-             console.warn(`Cannot set remote answer in state ${peerConnection.signalingState}.`);
-             return;
+      } else if (data.type === 'answer' && data.payload) {
+          if (peerConnection.signalingState === "have-local-offer") {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
+          } else {
+            console.warn(`Cannot set remote answer in state ${peerConnection.signalingState}.`);
           }
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
-      } else if (data.type === 'candidate') {
-          if (data.payload && peerConnection.signalingState !== "closed") { // Only add if connection is not closed
+      } else if (data.type === 'candidate' && data.payload) {
+          if (peerConnection.signalingState !== "closed") { 
              await peerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
+          } else {
+            console.warn("Tried to add ICE candidate to a closed peer connection.");
           }
       }
     } catch (error) {
        console.error("Error handling signaling message:", error, "Message:", data);
+       toast({ title: "Signaling Error", description: "Problem processing connection message.", variant: "destructive" });
     }
-  }, [peerConnection, roomId, localPlayer, signalingUrl]); 
+  }, [roomId, localPlayer, signalingUrl, toast]); // Removed peerConnection from deps, handle directly
   
+  // Poll for signaling messages
   useEffect(() => {
     if (!roomId || !localPlayer || (pagePhase !== 'playing' && pagePhase !== 'waitingForOpponent')) {
         return;
@@ -210,15 +217,13 @@ const TicTacToeClientPage: React.FC = () => {
         try {
             // Include senderId in poll request to allow server to filter out own messages if it supports it.
             // Or filter client-side as already done in handleSignalingMessage.
-            const response = await fetch(`${signalingUrl}?roomId=${roomId}&clientId=${localPlayer.toString()}`);
+            const response = await fetch(`${signalingUrl}?roomId=${roomId}&clientId=${localPlayer.toString()}`); // Use clientId for filtering
             if (!isActive) return;
 
             if (response.ok) {
                 const messages = await response.json();
                 if (Array.isArray(messages)) {
                     messages.forEach(msg => {
-                       // We already filter by senderId in handleSignalingMessage, so this check might be redundant 
-                       // if the server doesn't filter, but good for safety.
                        if (msg.senderId !== localPlayer?.toString()) { 
                            handleSignalingMessage(msg);
                        }
@@ -228,7 +233,10 @@ const TicTacToeClientPage: React.FC = () => {
                 console.error("Error polling signaling server:", response.statusText);
             }
         } catch (error) {
-            if (isActive) console.error("Polling error:", error);
+            if (isActive) {
+              console.error("Polling error:", error);
+              // Don't toast on every poll error, could be spammy
+            }
         } finally {
             if (isActive) {
                timeoutId = setTimeout(pollSignalingServer, pollInterval);
@@ -236,31 +244,33 @@ const TicTacToeClientPage: React.FC = () => {
         }
     };
     
-    timeoutId = setTimeout(pollSignalingServer, pollInterval); // Start polling
+    if (pagePhase === 'waitingForOpponent' || (pagePhase === 'playing' && localPlayer)) {
+      timeoutId = setTimeout(pollSignalingServer, pollInterval); 
+    }
     
     return () => { 
       isActive = false;
-      clearTimeout(timeoutId); // Clear timeout on cleanup
+      clearTimeout(timeoutId);
     };
   }, [pagePhase, roomId, localPlayer, handleSignalingMessage, signalingUrl]);
 
 
   useEffect(() => {
     const paramRoomId = searchParams.get('room');
-    if (paramRoomId && paramRoomId !== roomId) { // Only update if paramRoomId is new and different
+    if (paramRoomId && paramRoomId !== roomId) { 
       setRoomId(paramRoomId.toUpperCase());
-      // If joining through URL, and not yet having a role, assume joiner.
-      // Actual role setting happens in handleCreateRoom/handleJoinRoom.
-      // This useEffect is mainly for initializing roomId from URL.
-      if (!localPlayer && pagePhase === 'initial') {
-        // Do not automatically set localPlayer here, let join/create buttons handle it.
-        // Just set roomId and potentially transition pagePhase if needed.
-        // setPagePhase('joiningViaUrl'); // Could be a new phase if specific UX is needed
+      // If joining via URL, set up as Player 2, unless already set up as Player 1 by creating a room
+      if (!localPlayer) {
+        setInputRoomId(paramRoomId.toUpperCase()); // Pre-fill if joining from URL
+        // Don't auto-join here, let the Join button or create logic handle it
+        // This keeps the UI flow consistent.
       }
     }
-    // Initial loading complete after first effect run
-    if (isLoading) setIsLoading(false); 
-  }, [searchParams, roomId, localPlayer, pagePhase, isLoading]);
+    if (isLoading) {
+        const timer = setTimeout(() => setIsLoading(false), 500); // Simulate loading
+        return () => clearTimeout(timer);
+    }
+  }, [searchParams, roomId, localPlayer, isLoading]);
 
 
   const updateGameMessage = useCallback(() => {
@@ -268,7 +278,7 @@ const TicTacToeClientPage: React.FC = () => {
       setMessage('Create a new game room or join an existing one.');
       return;
     }
-    if (pagePhase === 'waitingForOpponent' && roomId) { // Changed from 'creatingRoom'
+    if (pagePhase === 'waitingForOpponent' && roomId) { 
       setMessage(`Room ID: ${roomId}. Share this. You are ${getPlayerThematicName(localPlayer || 1)}. Waiting for opponent...`);
       return;
     }
@@ -326,26 +336,23 @@ const TicTacToeClientPage: React.FC = () => {
     }
     setIsLoading(true);
     const cleanRoomId = inputRoomId.trim().toUpperCase();
-    setRoomId(cleanRoomId); // This will trigger useEffect for searchParams if URL is not yet updated
+    setRoomId(cleanRoomId); 
     setLocalPlayer(2); 
-    setCurrentPlayer(1); 
+    setCurrentPlayer(1); // Game always starts with player 1, even if P2 joins
     setBoard(createInitialBoard());
     setWinner(null);
     setIsDraw(false);
     setWinningCombination(null);
     setGamePhase('playing');
-    // For joiner, go to 'playing' phase, assuming connection will establish.
-    // Signaling useEffect will handle actual connection.
-    setPagePhase('playing'); 
+    setPagePhase('playing'); // Assume connection will establish or is in progress
 
-    // Update URL to reflect joined room, if not already set by param
     if (searchParams.get('room') !== cleanRoomId) {
         router.push(`/games/tic-tac-toe?room=${cleanRoomId}`, { scroll: false });
     }
     
     toast({
       title: "Joined Room!",
-      description: `You joined room: ${cleanRoomId}. You are ${getPlayerThematicName(2)}.`,
+      description: `You joined room: ${cleanRoomId}. You are ${getPlayerThematicName(2)}. Waiting for connection.`,
        className: "bg-destructive/10 border-destructive",
     });
     await initializePeerConnection(false); 
@@ -384,7 +391,7 @@ const TicTacToeClientPage: React.FC = () => {
       description: "Ready to create or join a new Tic-Tac-Toe game.",
       className: "bg-card border-foreground/20 shadow-lg",
     });
-    setTimeout(() => setIsLoading(false), 300); // Ensure loading state is reset
+    setTimeout(() => setIsLoading(false), 300); 
   };
 
   const handleOpponentMove = (newBoard: BoardState, nextPlayer: Player) => {
@@ -432,8 +439,11 @@ const TicTacToeClientPage: React.FC = () => {
     if (dataChannel && dataChannel.readyState === 'open') {
       dataChannel.send(JSON.stringify({ type: 'move', board: newBoard, currentPlayer: nextPlayer }));
     } else if (roomId) { 
-      toast({ title: "Connection Issue", description: "Opponent not connected or data channel closed. Moves are local.", variant: "destructive"});
+      toast({ title: "Connection Issue", description: "Opponent not connected or data channel closed. Moves are local. Trying to reconnect.", variant: "destructive"});
+      // Attempt to re-initialize if in a room but channel is not open
+      if (localPlayer) initializePeerConnection(localPlayer === 1);
     }
+
 
     const currentWinner = checkWinner(newBoard);
     if (currentWinner) {
@@ -523,7 +533,7 @@ const TicTacToeClientPage: React.FC = () => {
                     </Button>
                 </div>
                  <CardDescription className="text-xs text-muted-foreground italic space-y-1">
-                  <span>You are {getPlayerThematicName(localPlayer === 1 ? 1 : 2)}.</span><br/> {/* Corrected this to show current local player */}
+                  <span>You are {getPlayerThematicName(localPlayer)}.</span><br/>
                   <span>Waiting for opponent to join and connect...</span><br/>
                   <span>Once connected, the game will start automatically.</span>
                 </CardDescription>
@@ -533,7 +543,7 @@ const TicTacToeClientPage: React.FC = () => {
     </div>
   );
   
-  const renderGameScreenSkeleton = () => ( // This is used by the Suspense fallback now
+  const renderGameScreenSkeleton = () => ( 
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
       <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-3 sm:mb-4">
         <Skeleton className="h-8 w-8 rounded-md" />
@@ -561,6 +571,7 @@ const TicTacToeClientPage: React.FC = () => {
   if (isLoading && pagePhase === 'initial') return renderGameScreenSkeleton();
   if (pagePhase === 'initial') return renderInitialScreen();
   if (pagePhase === 'waitingForOpponent') return renderWaitingForOpponentScreen();
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
@@ -614,7 +625,7 @@ const TicTacToeClientPage: React.FC = () => {
              Waiting for {getPlayerThematicName(currentPlayer)}'s move...
            </p>
          )}
-         {pagePhase === 'playing' && roomId && dataChannel?.readyState !== 'open' && (!winner && !isDraw && localPlayer) && ( // Added localPlayer check here
+         {pagePhase === 'playing' && roomId && dataChannel?.readyState !== 'open' && (!winner && !isDraw && localPlayer) && ( 
             <p className="text-center text-sm mt-3 text-orange-500 dark:text-orange-400">
                 Attempting to connect to opponent...
             </p>
@@ -629,5 +640,3 @@ const TicTacToeClientPage: React.FC = () => {
 };
 
 export default TicTacToeClientPage;
-
-    

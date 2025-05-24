@@ -46,7 +46,7 @@ export default function ChooseGamePage() {
       <main className="flex-grow flex items-center justify-center">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 max-w-6xl w-full p-4">
           {games.map((game) => (
-            <Link key={game.name} href={game.href} passHref className="block h-full">
+            <Link key={game.name} href={game.href} passHref className="block h-full min-w-0"> {/* Added min-w-0 here */}
               <Card className="hover:shadow-2xl transition-all duration-300 ease-in-out group flex flex-col h-full overflow-hidden cursor-pointer ring-1 ring-transparent hover:ring-primary/30 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none">
                 <CardHeader className="p-0">
                   {game.previewComponent ? (

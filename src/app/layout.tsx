@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Lora, Playfair_Display } from 'next/font/google'; // Changed fonts
 import './globals.css';
@@ -20,6 +21,29 @@ const playfairDisplay = Playfair_Display({
 export const metadata: Metadata = {
   title: 'Pebble Arena',
   description: 'Strategic pebble game',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' }, // Standard favicon
+      { url: '/logo.svg', type: 'image/svg+xml' }, // Example if you have an SVG version
+    ],
+    apple: '/apple-touch-icon.png', // For Apple devices
+    // You can add other icons for different purposes if needed
+    // shortcut: '/shortcut-icon.png', // Example for shortcut icon
+    // other: [
+    //   {
+    //     rel: 'icon',
+    //     url: '/favicon-16x16.png',
+    //     sizes: '16x16',
+    //   },
+    //   {
+    //     rel: 'icon',
+    //     url: '/favicon-32x32.png',
+    //     sizes: '32x32',
+    //   },
+    // ],
+  },
+  // If you have a manifest.json, you can also link it here
+  // manifest: '/manifest.json',
 };
 
 export default function RootLayout({

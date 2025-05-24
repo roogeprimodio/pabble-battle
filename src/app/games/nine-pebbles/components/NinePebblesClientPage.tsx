@@ -10,7 +10,7 @@ import { ArrowLeft, RotateCcw, Info, Swords, Zap, ShieldQuestion, Sparkles, Skul
 import { useToast } from '@/hooks/use-toast';
 import GameBoardDisplay from './GameBoard';
 import PlayerPawnDisplay from './Pawn';
-import CombinedPlayerStatusDisplay from './PlayerStatusDisplay';
+import PlayerStatusDisplay from './PlayerStatusDisplay'; // Corrected import
 import GameBanner from './GameBanner';
 import {
   TOTAL_POINTS,
@@ -46,8 +46,8 @@ const NinePebblesClientPage: React.FC = () => {
     2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
   });
 
-  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0);
-  const [isCurrentPlayerOnInitialTwoPawnTurn, setIsCurrentPlayerOnInitialTwoPawnTurn] = useState(false);
+  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0); // How many pawns current player can place in this specific action/sequence
+  const [isCurrentPlayerOnInitialTwoPawnTurn, setIsCurrentPlayerOnInitialTwoPawnTurn] = useState(false); // True if current player is on their 2-pawn placement turn
 
   const [selectedPawnIndex, setSelectedPawnIndex] = useState<number | null>(null);
   const [pawnToRemoveIndex, setPawnToRemoveIndex] = useState<number | null>(null);
@@ -79,8 +79,6 @@ const NinePebblesClientPage: React.FC = () => {
     setPawnToRemoveIndex(null);
     setWinner(null);
     setMovingPawn(null);
-    // `pawnsToPlaceThisTurn` and `isCurrentPlayerOnInitialTwoPawnTurn` will be set by the useEffect
-    // when `currentPlayer` and `localGamePhase` are established for a new game.
   }, []);
 
 
@@ -107,51 +105,44 @@ const NinePebblesClientPage: React.FC = () => {
     }
   }, [isLoading]);
 
-  // Centralized logic for setting how many pawns the current player can place
   useEffect(() => {
     if (overallPagePhase === 'playing' && localGamePhase === 'placement') {
-      if (playerStats[currentPlayer].pawnsToPlace > 0) {
-        if (!playerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement) {
-          const numPawnsForThisTurn = Math.min(2, playerStats[currentPlayer].pawnsToPlace);
-          setPawnsToPlaceThisTurn(numPawnsForThisTurn);
-          setIsCurrentPlayerOnInitialTwoPawnTurn(numPawnsForThisTurn === 2);
+      const currentTurnPlayerStats = playerStats[currentPlayer];
+      if (currentTurnPlayerStats.pawnsToPlace > 0) {
+        if (!currentTurnPlayerStats.hasCompletedInitialTwoPawnPlacement) {
+          setPawnsToPlaceThisTurn(Math.min(2, currentTurnPlayerStats.pawnsToPlace));
+          setIsCurrentPlayerOnInitialTwoPawnTurn(true);
         } else {
-          setPawnsToPlaceThisTurn(Math.min(1, playerStats[currentPlayer].pawnsToPlace));
+          setPawnsToPlaceThisTurn(Math.min(1, currentTurnPlayerStats.pawnsToPlace));
           setIsCurrentPlayerOnInitialTwoPawnTurn(false);
         }
-      } else { // Current player has no pawns left to place
+      } else {
         setPawnsToPlaceThisTurn(0);
         setIsCurrentPlayerOnInitialTwoPawnTurn(false);
-        // If all pawns for both players are placed, move to movement phase
-        if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
-            if (localGamePhase === 'placement') { // Ensure this only happens if currently in placement
-                 setLocalGamePhase('movement');
-            }
+        if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0 && localGamePhase === 'placement') {
+          setLocalGamePhase('movement');
         }
       }
     } else if (localGamePhase !== 'placement') {
-        // Reset these if not in placement phase, to avoid carrying over old values
-        setPawnsToPlaceThisTurn(0);
-        setIsCurrentPlayerOnInitialTwoPawnTurn(false);
+      setPawnsToPlaceThisTurn(0);
+      setIsCurrentPlayerOnInitialTwoPawnTurn(false);
     }
   }, [currentPlayer, playerStats, overallPagePhase, localGamePhase]);
 
 
-  const executeSwitchPlayerAndPhase = useCallback(() => {
+  const executeSwitchPlayerAndPhase = useCallback((currentLatestStats: typeof playerStats) => {
     const nextPlayer = currentPlayer === 1 ? 2 : 1;
     let nextLocalGamePhase = localGamePhase;
 
-    const allPawnsPlacedByBoth = playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0;
+    const allPawnsPlacedByBoth = currentLatestStats[1].pawnsToPlace === 0 && currentLatestStats[2].pawnsToPlace === 0;
 
     if (allPawnsPlacedByBoth && localGamePhase === 'placement') {
         nextLocalGamePhase = 'movement';
     }
-    // The useEffect hook [currentPlayer, playerStats, overallPagePhase, localGamePhase]
-    // will now handle setting pawnsToPlaceThisTurn and isCurrentPlayerOnInitialTwoPawnTurn for the nextPlayer.
     
     setLocalGamePhase(nextLocalGamePhase);
     setCurrentPlayer(nextPlayer);
-  }, [currentPlayer, localGamePhase, playerStats]);
+  }, [currentPlayer, localGamePhase]);
 
 
   const updateMessageAndPawnsToPlace = useCallback(() => {
@@ -306,7 +297,7 @@ const NinePebblesClientPage: React.FC = () => {
                  updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
             }
             setPlayerStats(updatedPlayerStats); 
-            executeSwitchPlayerAndPhase(); 
+            executeSwitchPlayerAndPhase(updatedPlayerStats); 
           } else {
             setPlayerStats(updatedPlayerStats);
             setPawnsToPlaceThisTurn(remainingForThisActionSequence); 
@@ -342,12 +333,13 @@ const NinePebblesClientPage: React.FC = () => {
           setTimeout(() => { 
             setBoard(newBoard); 
             setMovingPawn(null); 
+            const currentStats = playerStats; 
 
             if (checkMill(newBoard, currentPlayer, movedPawnIndex)) {
               setLocalGamePhase('removing');
             } else {
-              if (!checkWinCondition(newBoard, playerStats)) { 
-                executeSwitchPlayerAndPhase();
+              if (!checkWinCondition(newBoard, currentStats)) { 
+                executeSwitchPlayerAndPhase(currentStats);
               }
             }
           }, 400); 
@@ -386,21 +378,15 @@ const NinePebblesClientPage: React.FC = () => {
                 if (pawnsToPlaceThisTurn > 0 && stillInPlacementPhaseOverall) {
                     setLocalGamePhase('placement'); 
                 } else {
-                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0 && !statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement) {
-                       statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
-                       setPlayerStats(prevStats => ({
-                         ...prevStats,
-                         [currentPlayer]: {
-                           ...prevStats[currentPlayer],
-                           hasCompletedInitialTwoPawnPlacement: true,
-                           pawnsToPlace: statsAfterRemoval[currentPlayer].pawnsToPlace, // Ensure this is current
-                           pawnsOnBoard: statsAfterRemoval[currentPlayer].pawnsOnBoard,
-                         }
-                       }));
+                    let finalStatsForTurn = JSON.parse(JSON.stringify(statsAfterRemoval));
+                    if (isCurrentPlayerOnInitialTwoPawnTurn && pawnsToPlaceThisTurn === 0 && !finalStatsForTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement) {
+                       finalStatsForTurn[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
                     }
-                    // Let the main useEffect handle setting phase to movement if needed
-                    executeSwitchPlayerAndPhase();
+                    setPlayerStats(finalStatsForTurn);
+                    executeSwitchPlayerAndPhase(finalStatsForTurn);
                 }
+            } else {
+                 setPlayerStats(statsAfterRemoval); 
             }
         }, PAWN_REMOVAL_ANIMATION_DURATION);
 
@@ -568,7 +554,7 @@ const NinePebblesClientPage: React.FC = () => {
       
       <GameBanner />
 
-      <CombinedPlayerStatusDisplay
+      <PlayerStatusDisplay
         player1Stats={playerStats[1]}
         player2Stats={playerStats[2]}
         player1Name={getPlayerThematicName(1)}
@@ -647,3 +633,5 @@ const NinePebblesLoadingSkeleton = () => (
 
 
 export default NinePebblesClientPage;
+
+    

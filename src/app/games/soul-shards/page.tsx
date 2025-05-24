@@ -91,14 +91,13 @@ const SoulShardsPage: React.FC = () => {
         else if (overallPagePhase === 'onlineWaitingForOpponent' && roomId) setMessage(`Room ID: ${roomId}. Share this ID. Click "Start Game" when ready.`);
         return;
     }
+    const localPlayerInfo = localPlayer ? `(You are ${getPlayerThematicNameSoulShards(localPlayer)})` : '(Local Game)';
     if (localGamePhase === 'gameOver' && !winner) {
       setMessage("The battle for Soul Shards ends in a stalemate!");
     } else if (localGamePhase === 'deployment') {
-       const localPlayerName = localPlayer ? getPlayerThematicNameSoulShards(localPlayer) : 'Observer';
-       setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}: Deploy your units. (You are ${localPlayerName})`);
+       setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}: Deploy your units. ${localPlayerInfo}`);
     } else {
-      const localPlayerName = localPlayer ? getPlayerThematicNameSoulShards(localPlayer) : 'Observer';
-      setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}'s turn. (You are ${localPlayerName})`);
+      setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}'s turn. ${localPlayerInfo}`);
     }
   }, [winner, currentPlayer, localGamePhase, overallPagePhase, roomId, localPlayer]);
 
@@ -121,7 +120,7 @@ const SoulShardsPage: React.FC = () => {
     setShards([]); 
   };
 
-  useEffect(() => { // Ensure initial units are on the board state
+  useEffect(() => { 
     resetGameState();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -209,7 +208,7 @@ const SoulShardsPage: React.FC = () => {
 
     if (localGamePhase === 'deployment') {
       if (board[r][c].unitId === null && board[r][c].terrain !== 'impassable') {
-        const newUnitId = `temp_unit_${generateUniqueId(4)}`;
+        const newUnitId = `unit_${currentPlayer}_${generateUniqueId(4)}`;
         const newUnit: Unit = {
           id: newUnitId,
           player: currentPlayer,
@@ -236,9 +235,10 @@ const SoulShardsPage: React.FC = () => {
             units: [...prevState.units, newUnit],
           }));
         }
-        toast({ title: "Unit Deployed (Visually)", description: `Harvester placed at (${r}, ${c}).` });
-        // Basic turn switch for demo. Real logic would be more complex.
-        // setCurrentPlayer(prev => prev === 1 ? 2 : 1); 
+        toast({ title: "Unit Deployed", description: `${getPlayerThematicNameSoulShards(currentPlayer)} deployed a Harvester at (${r}, ${c}).` });
+        
+        // Switch turns for deployment
+        setCurrentPlayer(prev => prev === 1 ? 2 : 1);
       } else {
         toast({ title: "Invalid Deployment", description: "Cannot deploy here.", variant: "destructive" });
       }
@@ -252,6 +252,8 @@ const SoulShardsPage: React.FC = () => {
            // TODO: Implement movement logic (check range, terrain, if cell is empty etc.)
            toast({title: "Move Action", description: `Attempting to move unit ${selectedUnitId} to (${r},${c})`});
            setSelectedUnitId(null); // Deselect after attempting move
+           // TODO: Switch turn after successful move
+           // setCurrentPlayer(prev => prev === 1 ? 2 : 1);
         } else {
           setSelectedUnitId(null);
         }

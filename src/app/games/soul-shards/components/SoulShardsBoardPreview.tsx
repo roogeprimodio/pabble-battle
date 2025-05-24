@@ -6,7 +6,7 @@ import Image from 'next/image';
 
 const SoulShardsBoardPreview: React.FC = () => {
   return (
-    <div className="w-full h-full bg-card rounded-t-lg aspect-[16/10] flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+    <div className="relative w-full h-full bg-card rounded-t-lg aspect-[16/10] flex items-center justify-center p-3 sm:p-4 overflow-hidden">
       <Image
         src="https://placehold.co/600x400.png" // Placeholder image
         alt="Soul Shards Game Preview"

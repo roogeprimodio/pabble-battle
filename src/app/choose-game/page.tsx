@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 import NinePebblesBoardPreview from './components/NinePebblesBoardPreview';
 import TicTacToeBoardPreview from './components/TicTacToeBoardPreview';
-import SoulShardsBoardPreview from '../games/soul-shards/components/SoulShardsBoardPreview'; // New Preview
+import SoulShardsBoardPreview from '../games/soul-shards/components/SoulShardsBoardPreview';
 
 export default function ChooseGamePage() {
   const games = [

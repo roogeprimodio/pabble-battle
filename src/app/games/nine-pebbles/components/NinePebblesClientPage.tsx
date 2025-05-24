@@ -47,9 +47,8 @@ const NinePebblesClientPage: React.FC = () => {
     2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
   });
 
-  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0);
-  const [pawnsPlacedThisActionSequence, setPawnsPlacedThisActionSequence] = useState(0);
-  const [isCurrentPlayerOnInitialTwoPawnTurn, setIsCurrentPlayerOnInitialTwoPawnTurn] = useState(false);
+  const [pawnsToPlaceThisTurn, setPawnsToPlaceThisTurn] = useState(0); // How many pawns current player can place in this specific turn/action
+  const [pawnsPlacedThisActionSequence, setPawnsPlacedThisActionSequence] = useState(0); // How many placed in current action sequence
 
   const [selectedPawnIndex, setSelectedPawnIndex] = useState<number | null>(null);
   const [pawnToRemoveIndex, setPawnToRemoveIndex] = useState<number | null>(null);
@@ -72,7 +71,6 @@ const NinePebblesClientPage: React.FC = () => {
 
   const resetGameState = useCallback(() => {
     setBoard(createInitialBoard());
-    // setLocalGamePhase('placement'); // This will be set by mode selection
     setPlayerStats({
       1: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
       2: { pawnsToPlace: PAWNS_PER_PLAYER, pawnsOnBoard: 0, hasCompletedInitialTwoPawnPlacement: false },
@@ -82,23 +80,21 @@ const NinePebblesClientPage: React.FC = () => {
     setWinner(null);
     setMovingPawn(null);
     setPawnsPlacedThisActionSequence(0);
-    // setCurrentPlayer and overallPagePhase are handled by the calling context (e.g., handleFullReset, handleLocalPlayerSelect)
   }, []);
 
 
   useEffect(() => {
     const existingRoomIdFromUrl = searchParams.get('room');
     if (overallPagePhase === 'initialSetup' && !roomId && existingRoomIdFromUrl) {
-      // Only auto-join if we are in the initial setup phase and haven't created/joined a room yet.
       setRoomId(existingRoomIdFromUrl.toUpperCase());
       setLocalPlayer(2);
-      setCurrentPlayer(1); // Angels (Player 1) always start, even if P2 joins.
-      resetGameState(); // Reset board and player stats for the new game.
+      setCurrentPlayer(1); 
+      resetGameState(); 
       setOverallPagePhase('playing');
       setLocalGamePhase('placement');
       toast({ title: "Joined Room", description: `Room ID: ${existingRoomIdFromUrl.toUpperCase()}. You are Demons. Angels start.` });
     }
-  }, [searchParams, overallPagePhase, roomId, resetGameState, toast]);
+  }, [searchParams, overallPagePhase, roomId, resetGameState, toast, setLocalPlayer, setCurrentPlayer, setOverallPagePhase, setLocalGamePhase]);
 
 
   useEffect(() => {
@@ -116,22 +112,18 @@ const NinePebblesClientPage: React.FC = () => {
       if (currentTurnPlayerStats.pawnsToPlace > 0) {
         if (!currentTurnPlayerStats.hasCompletedInitialTwoPawnPlacement) {
           setPawnsToPlaceThisTurn(Math.min(2, currentTurnPlayerStats.pawnsToPlace));
-          setIsCurrentPlayerOnInitialTwoPawnTurn(true);
         } else {
           setPawnsToPlaceThisTurn(Math.min(1, currentTurnPlayerStats.pawnsToPlace));
-          setIsCurrentPlayerOnInitialTwoPawnTurn(false);
         }
-      } else {
+      } else { 
         setPawnsToPlaceThisTurn(0);
-        setIsCurrentPlayerOnInitialTwoPawnTurn(false);
         if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
-          setLocalGamePhase('movement');
+          setLocalGamePhase('movement'); 
         }
       }
-      setPawnsPlacedThisActionSequence(0); // Reset for the new turn's allowance
-    } else if (localGamePhase !== 'placement') {
+      setPawnsPlacedThisActionSequence(0); 
+    } else if (localGamePhase !== 'placement') { 
       setPawnsToPlaceThisTurn(0);
-      setIsCurrentPlayerOnInitialTwoPawnTurn(false);
       setPawnsPlacedThisActionSequence(0);
     }
   }, [currentPlayer, playerStats, overallPagePhase, localGamePhase]);
@@ -182,7 +174,9 @@ const NinePebblesClientPage: React.FC = () => {
       } else if (playerStats[1].pawnsToPlace === 0 && playerStats[2].pawnsToPlace === 0) {
          setMessage("All pawns placed. Movement phase starts.");
       } else {
-         setMessage(`${currentPlayerName}'s turn is processing. Awaiting next action or player.`);
+         // This case might occur if a player finishes placing all 9 pawns, but opponent still has some.
+         // Or if an action completed but useEffect for next turn hasn't updated message yet.
+         setMessage(`${currentPlayerName}'s turn processing... ${localPlayerInfo}`);
       }
     } else if (localGamePhase === 'movement') {
       setMessage(`${currentPlayerName}'s turn${localPlayerInfo}. Select a pawn to move.`);
@@ -199,9 +193,9 @@ const NinePebblesClientPage: React.FC = () => {
   const handleFullReset = useCallback(() => {
     setIsLoading(true);
     resetGameState();
-    setCurrentPlayer(1); // Default starting player for new setup
+    setCurrentPlayer(1); 
     setOverallPagePhase('initialSetup');
-    setLocalGamePhase('placement'); // Or 'initialSetup' depending on flow
+    setLocalGamePhase('placement'); 
     setRoomId(null);
     setInputRoomId('');
     setLocalPlayer(null);
@@ -288,8 +282,8 @@ const NinePebblesClientPage: React.FC = () => {
     let updatedPlayerStats = JSON.parse(JSON.stringify(playerStats)) as typeof playerStats;
 
     if (localGamePhase === 'placement') {
-      const pawnsCanBePlacedThisAction = pawnsToPlaceThisTurn - pawnsPlacedThisActionSequence;
-      if (newBoard[index] === null && pawnsCanBePlacedThisAction > 0 && updatedPlayerStats[currentPlayer].pawnsToPlace > 0) {
+      const canStillPlaceInThisAction = pawnsPlacedThisActionSequence < pawnsToPlaceThisTurn;
+      if (newBoard[index] === null && canStillPlaceInThisAction && updatedPlayerStats[currentPlayer].pawnsToPlace > 0) {
         newBoard[index] = currentPlayer;
         updatedPlayerStats[currentPlayer].pawnsToPlace -= 1;
         updatedPlayerStats[currentPlayer].pawnsOnBoard += 1;
@@ -299,24 +293,23 @@ const NinePebblesClientPage: React.FC = () => {
 
         if (checkMill(newBoard, currentPlayer, index)) {
           setPlayerStats(updatedPlayerStats); 
-          setPawnsPlacedThisActionSequence(newPawnsPlacedCount); // Update progress before going to remove phase
+          setPawnsPlacedThisActionSequence(newPawnsPlacedCount);
           setLocalGamePhase('removing');
         } else {
-          if (newPawnsPlacedCount === pawnsToPlaceThisTurn) { // Player has placed all pawns for this specific action
-            if (isCurrentPlayerOnInitialTwoPawnTurn && !updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement) {
+          if (newPawnsPlacedCount === pawnsToPlaceThisTurn) { 
+            if (!updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement && pawnsToPlaceThisTurn === 2) {
                  updatedPlayerStats[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
             }
             setPlayerStats(updatedPlayerStats); 
             executeSwitchPlayerAndPhase(updatedPlayerStats); 
           } else {
-            // Player still has pawns to place *in this current action sequence*
             setPlayerStats(updatedPlayerStats);
             setPawnsPlacedThisActionSequence(newPawnsPlacedCount); 
           }
         }
       } else if (newBoard[index] !== null) {
         toast({ title: "Invalid Placement", description: "This position is already occupied.", variant: "destructive" });
-      } else if (pawnsCanBePlacedThisAction === 0 || updatedPlayerStats[currentPlayer].pawnsToPlace === 0) {
+      } else if (!canStillPlaceInThisAction || updatedPlayerStats[currentPlayer].pawnsToPlace === 0) {
          toast({ title: "Placement Limit Reached", description: `No more pawns for this turn or all placed. Check messages.`, variant: "default" });
       }
     } else if (localGamePhase === 'movement') {
@@ -344,8 +337,7 @@ const NinePebblesClientPage: React.FC = () => {
           setTimeout(() => { 
             setBoard(newBoard); 
             setMovingPawn(null); 
-            // Use a fresh copy of playerStats from state for win condition check
-            const currentStatsAfterMove = playerStats; 
+            const currentStatsAfterMove = JSON.parse(JSON.stringify(playerStats)); // Use current playerStats from state
 
             if (checkMill(newBoard, currentPlayer, movedPawnIndex)) {
               setLocalGamePhase('removing');
@@ -386,21 +378,16 @@ const NinePebblesClientPage: React.FC = () => {
             const gameWon = checkWinCondition(boardAfterRemoval, statsAfterRemoval); 
             if (!gameWon) {
                 const stillInPlacementPhaseOverall = statsAfterRemoval[1].pawnsToPlace > 0 || statsAfterRemoval[2].pawnsToPlace > 0;
-                
-                // If player was in the middle of a multi-pawn placement (e.g. initial 2) and formed a mill
-                const pawnsLeftToPlaceInCurrentAction = pawnsToPlaceThisTurn - pawnsPlacedThisActionSequence;
+                const pawnsActuallyPlacedInThisAction = pawnsPlacedThisActionSequence; // How many were placed BEFORE removal
+                const pawnsAllowedInThisAction = pawnsToPlaceThisTurn; // Total allowance for this action
 
-                if (pawnsLeftToPlaceInCurrentAction > 0 && stillInPlacementPhaseOverall) {
-                    setLocalGamePhase('placement'); // Return to placement to finish the current action sequence
-                    // Message will update via useEffect
+                if (pawnsActuallyPlacedInThisAction < pawnsAllowedInThisAction && stillInPlacementPhaseOverall) {
+                    setLocalGamePhase('placement');
                 } else {
-                    // Action sequence was completed by forming the mill, or it was a 1-pawn placement.
-                    // Mark initial placement as done if applicable
-                    if (isCurrentPlayerOnInitialTwoPawnTurn && !statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement) {
+                    if (!statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement && pawnsAllowedInThisAction === 2) {
                        statsAfterRemoval[currentPlayer].hasCompletedInitialTwoPawnPlacement = true;
-                       // We directly modify statsAfterRemoval here as it's a fresh copy
                     }
-                    setPlayerStats(statsAfterRemoval); // Commit stats before switching
+                    setPlayerStats(statsAfterRemoval);
                     executeSwitchPlayerAndPhase(statsAfterRemoval);
                 }
             } else {
@@ -570,7 +557,7 @@ const NinePebblesClientPage: React.FC = () => {
         </div>
       </header>
       
-      <GameBanner />
+      <GameBanner /> {/* This is the banner for ads or other info */}
 
       <PlayerStatusDisplay
         player1Stats={playerStats[1]}
@@ -631,7 +618,7 @@ const NinePebblesLoadingSkeleton = () => (
       <Skeleton className="h-7 w-40 rounded-md" />
       <div className="flex items-center gap-2"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div>
     </header>
-    <GameBanner /> 
+    <GameBanner /> {/* Banner for loading state */}
     <div className="w-full max-w-md mx-auto mb-3 sm:mb-4">
       <div className="flex items-stretch justify-center gap-2 sm:gap-3">
         <Skeleton className="h-[70px] sm:h-[80px] flex-1 rounded-lg" />

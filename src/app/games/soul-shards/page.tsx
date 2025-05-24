@@ -23,6 +23,12 @@ import {
   getPlayerThematicNameSoulShards,
   BOARD_ROWS,
   BOARD_COLS,
+  MAX_UNITS_PER_PLAYER,
+  SHARDS_TO_WIN,
+  HARVESTER_MOVEMENT_RANGE,
+  getPlayerDeploymentZone,
+  createInitialSoulShards,
+  isValidMove,
 } from '@/lib/soul-shards-rules';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -37,7 +43,8 @@ const initialPlayerState = (player: Player): PlayerStateSoulShards => ({
   name: getPlayerThematicNameSoulShards(player),
   shardsCollected: 0,
   faithOrDespair: 100,
-  units: [], // Start with no units
+  units: [],
+  unitsDeployed: 0,
 });
 
 
@@ -46,16 +53,17 @@ const SoulShardsPage: React.FC = () => {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [board, setBoard] = useState<BoardState>(createInitialSoulShardsBoard());
+  const [shards, setShards] = useState<SoulShard[]>(createInitialSoulShards());
+  const [board, setBoard] = useState<BoardState>(createInitialSoulShardsBoard(shards));
   const [player1State, setPlayer1State] = useState<PlayerStateSoulShards>(initialPlayerState(1));
   const [player2State, setPlayer2State] = useState<PlayerStateSoulShards>(initialPlayerState(2));
   const [currentPlayer, setCurrentPlayer] = useState<Player>(1);
-  const [localGamePhase, setLocalGamePhase] = useState<LocalGamePhaseSoulShards>('deployment'); 
+  const [localGamePhase, setLocalGamePhase] = useState<LocalGamePhaseSoulShards>('deployment');
   const [winner, setWinner] = useState<Player | null>(null);
   const [message, setMessage] = useState<string>('Choose game mode for Soul Shards.');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [shards, setShards] = useState<SoulShard[]>([]);
+
 
   const [overallPagePhase, setOverallPagePhase] = useState<OverallPagePhase>('initialSetup');
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -70,8 +78,8 @@ const SoulShardsPage: React.FC = () => {
       setLocalPlayer(2);
       setCurrentPlayer(1);
       setOverallPagePhase('playing');
-      setLocalGamePhase('deployment'); 
-      toast({ title: "Joined Soul Shards Room", description: `Room: ${existingRoomId.toUpperCase()}. You are ${getPlayerThematicNameSoulShards(2)}. ${getPlayerThematicNameSoulShards(1)} starts.` });
+      setLocalGamePhase('deployment');
+      toast({ title: "Joined Soul Shards Room", description: `Room: ${existingRoomId.toUpperCase()}. You are ${getPlayerThematicNameSoulShards(2)}. ${getPlayerThematicNameSoulShards(1)} starts deployment.` });
     } else {
       setOverallPagePhase('initialSetup');
     }
@@ -81,7 +89,7 @@ const SoulShardsPage: React.FC = () => {
 
   const updateGameMessage = useCallback(() => {
     if (winner) {
-      setMessage(`${getPlayerThematicNameSoulShards(winner)} have claimed victory!`);
+      setMessage(`${getPlayerThematicNameSoulShards(winner)} have claimed victory by collecting ${SHARDS_TO_WIN} Soul Shards!`);
       return;
     }
      if (overallPagePhase !== 'playing') {
@@ -92,35 +100,48 @@ const SoulShardsPage: React.FC = () => {
         return;
     }
     const localPlayerInfo = localPlayer ? `(You are ${getPlayerThematicNameSoulShards(localPlayer)})` : '(Local Game)';
+    const currentPlayerName = getPlayerThematicNameSoulShards(currentPlayer);
+
     if (localGamePhase === 'gameOver' && !winner) {
-      setMessage("The battle for Soul Shards ends in a stalemate!");
+      setMessage("The battle for Soul Shards ends in a stalemate!"); // Should not happen with current rules
     } else if (localGamePhase === 'deployment') {
-       setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}: Deploy your units. ${localPlayerInfo}`);
-    } else {
-      setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}'s turn. ${localPlayerInfo}`);
+      const unitsLeftToDeploy = MAX_UNITS_PER_PLAYER - (currentPlayer === 1 ? player1State.unitsDeployed : player2State.unitsDeployed);
+      if (unitsLeftToDeploy > 0) {
+        setMessage(`${currentPlayerName}: Deploy ${unitsLeftToDeploy} more Harvester(s) in your zone. ${localPlayerInfo}`);
+      } else {
+        setMessage(`All units deployed. ${getPlayerThematicNameSoulShards(currentPlayer === 1 ? 2: 1)} to deploy or starting playing phase. ${localPlayerInfo}`);
+      }
+    } else if (localGamePhase === 'playing') {
+      if (selectedUnitId) {
+        const selectedUnit = [...player1State.units, ...player2State.units].find(u => u.id === selectedUnitId);
+        setMessage(`${currentPlayerName}: Move selected ${selectedUnit?.type || 'unit'}. ${localPlayerInfo}`);
+      } else {
+        setMessage(`${currentPlayerName}'s turn. Select a unit to move. ${localPlayerInfo}`);
+      }
     }
-  }, [winner, currentPlayer, localGamePhase, overallPagePhase, roomId, localPlayer]);
+  }, [winner, currentPlayer, localGamePhase, overallPagePhase, roomId, localPlayer, player1State.units, player2State.units, player1State.unitsDeployed, player2State.unitsDeployed, selectedUnitId]);
 
   useEffect(() => {
     updateGameMessage();
   }, [updateGameMessage]);
 
   const resetGameState = () => {
-    const newBoard = createInitialSoulShardsBoard();
+    const initialShards = createInitialSoulShards();
+    const newBoard = createInitialSoulShardsBoard(initialShards);
     const p1Initial = initialPlayerState(1);
     const p2Initial = initialPlayerState(2);
-    
+
+    setShards(initialShards);
     setBoard(newBoard);
     setPlayer1State(p1Initial);
     setPlayer2State(p2Initial);
     setCurrentPlayer(1);
-    setLocalGamePhase('deployment'); 
+    setLocalGamePhase('deployment');
     setWinner(null);
     setSelectedUnitId(null);
-    setShards([]); 
   };
 
-  useEffect(() => { 
+  useEffect(() => {
     resetGameState();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,7 +156,7 @@ const SoulShardsPage: React.FC = () => {
     setRoomId(null);
     toast({
       title: "Soul Shards: Local Battle Begins!",
-      description: `${getPlayerThematicNameSoulShards(player)} will command their forces first.`,
+      description: `${getPlayerThematicNameSoulShards(player)} will command their forces first. Start deployment.`,
       className: player === 1 ? "bg-primary/10 border-primary" : "bg-destructive/10 border-destructive",
     });
     setTimeout(() => setIsLoading(false), 300);
@@ -164,9 +185,9 @@ const SoulShardsPage: React.FC = () => {
     const newRoomId = generateUniqueId();
     setRoomId(newRoomId);
     setLocalPlayer(1);
-    setCurrentPlayer(1); 
+    setCurrentPlayer(1);
     setOverallPagePhase('onlineWaitingForOpponent');
-    setLocalGamePhase('deployment'); 
+    setLocalGamePhase('deployment');
     router.push(`/games/soul-shards?room=${newRoomId}`, { scroll: false });
     toast({ title: "Soul Shards Room Created!", description: `Room ID: ${newRoomId}. You are ${getPlayerThematicNameSoulShards(1)}. Share this ID.`});
     setIsLoading(false);
@@ -182,11 +203,11 @@ const SoulShardsPage: React.FC = () => {
     const cleanRoomId = inputRoomId.trim().toUpperCase();
     setRoomId(cleanRoomId);
     setLocalPlayer(2);
-    setCurrentPlayer(1); 
+    setCurrentPlayer(1);
     setOverallPagePhase('playing');
-    setLocalGamePhase('deployment'); 
+    setLocalGamePhase('deployment');
     router.push(`/games/soul-shards?room=${cleanRoomId}`, { scroll: false });
-    toast({ title: "Joined Soul Shards Room!", description: `Room: ${cleanRoomId}. You are ${getPlayerThematicNameSoulShards(2)}. ${getPlayerThematicNameSoulShards(1)} starts.`});
+    toast({ title: "Joined Soul Shards Room!", description: `Room: ${cleanRoomId}. You are ${getPlayerThematicNameSoulShards(2)}. ${getPlayerThematicNameSoulShards(1)} starts deployment.`});
     setIsLoading(false);
   };
 
@@ -198,6 +219,34 @@ const SoulShardsPage: React.FC = () => {
     }
   };
 
+  const switchTurn = () => {
+    setSelectedUnitId(null); // Deselect unit on turn switch
+    const nextPlayer = currentPlayer === 1 ? 2 : 1;
+    setCurrentPlayer(nextPlayer);
+    // Reset 'canMove' for all units of the next player
+    if (nextPlayer === 1) {
+        setPlayer1State(prev => ({ ...prev, units: prev.units.map(u => ({ ...u, canMove: true })) }));
+    } else {
+        setPlayer2State(prev => ({ ...prev, units: prev.units.map(u => ({ ...u, canMove: true })) }));
+    }
+  };
+
+  const checkWinCondition = (playerState: PlayerStateSoulShards) => {
+    if (playerState.shardsCollected >= SHARDS_TO_WIN) {
+      setWinner(playerState.player);
+      setLocalGamePhase('gameOver');
+      setOverallPagePhase('gameOver');
+      toast({
+          title: "Victory!",
+          description: `${getPlayerThematicNameSoulShards(playerState.player)} has collected ${SHARDS_TO_WIN} Soul Shards!`,
+          className: playerState.player === 1 ? "bg-primary/20 border-primary" : "bg-destructive/20 border-destructive",
+          duration: 5000,
+      });
+      return true;
+    }
+    return false;
+  };
+
 
   const handleCellClick = (r: number, c: number) => {
     if (winner || overallPagePhase !== 'playing' || localGamePhase === 'gameOver' || isLoading) return;
@@ -206,65 +255,127 @@ const SoulShardsPage: React.FC = () => {
         return;
     }
 
+    let currentBoard = board.map(row => row.map(cell => ({ ...cell })));
+    let p1s = {...player1State, units: player1State.units.map(u => ({...u}))};
+    let p2s = {...player2State, units: player2State.units.map(u => ({...u}))};
+
+
     if (localGamePhase === 'deployment') {
-      if (board[r][c].unitId === null && board[r][c].terrain !== 'impassable') {
-        const newUnitId = `unit_${currentPlayer}_${generateUniqueId(4)}`;
-        const newUnit: Unit = {
-          id: newUnitId,
-          player: currentPlayer,
-          type: 'Harvester', // Default type for this visual test
-          health: 10,
-          attack: 1,
-          position: { r, c },
-        };
+      const deploymentZone = getPlayerDeploymentZone(currentPlayer);
+      const playerUnitsDeployed = currentPlayer === 1 ? p1s.unitsDeployed : p2s.unitsDeployed;
 
-        setBoard(prevBoard => {
-          const newBoardState = prevBoard.map(row => row.map(cell => ({ ...cell })));
-          newBoardState[r][c].unitId = newUnitId;
-          return newBoardState;
-        });
-
-        if (currentPlayer === 1) {
-          setPlayer1State(prevState => ({
-            ...prevState,
-            units: [...prevState.units, newUnit],
-          }));
-        } else {
-          setPlayer2State(prevState => ({
-            ...prevState,
-            units: [...prevState.units, newUnit],
-          }));
-        }
-        toast({ title: "Unit Deployed", description: `${getPlayerThematicNameSoulShards(currentPlayer)} deployed a Harvester at (${r}, ${c}).` });
-        
-        // Switch turns for deployment
-        setCurrentPlayer(prev => prev === 1 ? 2 : 1);
-      } else {
-        toast({ title: "Invalid Deployment", description: "Cannot deploy here.", variant: "destructive" });
+      if (playerUnitsDeployed >= MAX_UNITS_PER_PLAYER) {
+        toast({ title: "Deployment Limit Reached", description: `You have deployed all ${MAX_UNITS_PER_PLAYER} units.`, variant: "default" });
+        return;
       }
+      if (r < deploymentZone.startRow || r > deploymentZone.endRow) {
+        toast({ title: "Invalid Deployment Zone", description: `Deploy within rows ${deploymentZone.startRow}-${deploymentZone.endRow}.`, variant: "destructive" });
+        return;
+      }
+      if (currentBoard[r][c].unitId !== null) {
+        toast({ title: "Cell Occupied", description: "Cannot deploy on an occupied cell.", variant: "destructive" });
+        return;
+      }
+       if (currentBoard[r][c].terrain === 'impassable') {
+        toast({ title: "Impassable Terrain", description: "Cannot deploy here.", variant: "destructive" });
+        return;
+      }
+
+      const newUnitId = `unit_${currentPlayer}_${generateUniqueId(4)}`;
+      const newUnit: Unit = {
+        id: newUnitId,
+        player: currentPlayer,
+        type: 'Harvester',
+        health: 10,
+        attack: 1,
+        position: { r, c },
+        canMove: true,
+      };
+
+      currentBoard[r][c].unitId = newUnitId;
+      setBoard(currentBoard);
+
+      if (currentPlayer === 1) {
+        p1s.units.push(newUnit);
+        p1s.unitsDeployed += 1;
+        setPlayer1State(p1s);
+      } else {
+        p2s.units.push(newUnit);
+        p2s.unitsDeployed += 1;
+        setPlayer2State(p2s);
+      }
+      toast({ title: "Unit Deployed", description: `${getPlayerThematicNameSoulShards(currentPlayer)} deployed a Harvester at (${r}, ${c}).` });
+
+      if (p1s.unitsDeployed === MAX_UNITS_PER_PLAYER && p2s.unitsDeployed === MAX_UNITS_PER_PLAYER) {
+        setLocalGamePhase('playing');
+        // Player 1 starts the 'playing' phase
+        if (currentPlayer === 2) switchTurn(); // If P2 just finished deploying, switch to P1 for playing phase
+        else { // P1 finished deploying, ensure P1's units can move
+             setPlayer1State(prev => ({ ...prev, units: prev.units.map(u => ({ ...u, canMove: true })) }));
+        }
+
+      } else {
+        switchTurn();
+      }
+
     } else if (localGamePhase === 'playing') {
-      // Placeholder for unit selection and movement logic
-      const unitOnCell = [...player1State.units, ...player2State.units].find(u => u.position.r === r && u.position.c === c);
+      const unitOnCell = [...p1s.units, ...p2s.units].find(u => u.position.r === r && u.position.c === c);
+
       if (selectedUnitId) {
-        // Attempt to move selected unit
-        const unitToMove = [...player1State.units, ...player2State.units].find(u => u.id === selectedUnitId);
-        if (unitToMove && unitToMove.player === currentPlayer) {
-           // TODO: Implement movement logic (check range, terrain, if cell is empty etc.)
-           toast({title: "Move Action", description: `Attempting to move unit ${selectedUnitId} to (${r},${c})`});
-           setSelectedUnitId(null); // Deselect after attempting move
-           // TODO: Switch turn after successful move
-           // setCurrentPlayer(prev => prev === 1 ? 2 : 1);
-        } else {
+        const unitToMove = (currentPlayer === 1 ? p1s.units : p2s.units).find(u => u.id === selectedUnitId);
+        if (unitToMove && unitToMove.canMove && isValidMove(unitToMove, r, c, currentBoard)) {
+          const oldR = unitToMove.position.r;
+          const oldC = unitToMove.position.c;
+
+          currentBoard[oldR][oldC].unitId = null; // Clear old position on board
+          unitToMove.position = { r, c };       // Update unit's position
+          currentBoard[r][c].unitId = unitToMove.id; // Set new position on board
+          unitToMove.canMove = false; // Unit has moved this turn
+
+          let shardCollectedThisMove = false;
+          if (currentBoard[r][c].shardId) {
+            const shardId = currentBoard[r][c].shardId as string;
+            const newShardsList = shards.filter(s => s.id !== shardId);
+            setShards(newShardsList);
+            currentBoard[r][c].shardId = null;
+
+            if (currentPlayer === 1) {
+              p1s.shardsCollected += 1;
+            } else {
+              p2s.shardsCollected += 1;
+            }
+            shardCollectedThisMove = true;
+            toast({ title: "Soul Shard Collected!", description: `${getPlayerThematicNameSoulShards(currentPlayer)} collected a shard!`, className: "bg-accent/20 border-accent" });
+          }
+          
+          setBoard(currentBoard);
+          if (currentPlayer === 1) setPlayer1State(p1s); else setPlayer2State(p2s);
+
+          if (shardCollectedThisMove && checkWinCondition(currentPlayer === 1 ? p1s : p2s)) {
+            return; // Game over
+          }
+          
           setSelectedUnitId(null);
+          switchTurn();
+
+        } else if (unitOnCell && unitOnCell.player === currentPlayer && unitOnCell.id !== selectedUnitId) {
+            // Clicked on another of own units, switch selection
+            setSelectedUnitId(unitOnCell.id);
+            toast({title: "Unit Re-selected", description: `Selected ${unitOnCell.type}. Choose where to move.`});
+        } else if (unitToMove && unitToMove.id === selectedUnitId && unitOnCell?.id === selectedUnitId){
+            // Clicked on already selected unit, deselect
+            setSelectedUnitId(null);
+        } else {
+          toast({ title: "Invalid Move", description: "Cannot move there, or unit cannot move again this turn.", variant: "destructive" });
         }
       } else if (unitOnCell && unitOnCell.player === currentPlayer) {
-        // Select unit
         setSelectedUnitId(unitOnCell.id);
-        toast({title: "Unit Selected", description: `${unitOnCell.type} selected.`});
+        toast({ title: "Unit Selected", description: `${unitOnCell.type} selected. Choose where to move.` });
       } else if (unitOnCell && unitOnCell.player !== currentPlayer) {
-        toast({title: "Enemy Unit", description: `That's an enemy ${unitOnCell.type}.`});
+        toast({ title: "Enemy Unit", description: `That's an enemy ${unitOnCell.type}.` });
       } else {
-        toast({title: "Empty Cell", description: `Cell (${r}, ${c}) is empty.`});
+        // Clicked an empty cell without a unit selected
+        setSelectedUnitId(null); // Ensure deselection
       }
     }
   };
@@ -433,13 +544,7 @@ const SoulShardsPage: React.FC = () => {
          )}
 
       <main className="flex-grow w-full flex flex-col items-center justify-center">
-         <Card className="w-full max-w-xl text-center shadow-xl my-4">
-          <CardHeader>
-            <div className="flex justify-center mb-2"><Construction className="h-12 w-12 text-accent animate-bounce" /></div>
-            <CardTitle className="text-xl font-heading">Soul Shards - Under Construction!</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <CardDescription className="text-sm mb-3">Core game mechanics are being forged. Basic board interaction is enabled.</CardDescription>
+        { localGamePhase === 'deployment' || localGamePhase === 'playing' || localGamePhase === 'gameOver' ? (
              <SoulShardsBoard
                 board={board}
                 units={[...player1State.units, ...player2State.units]}
@@ -447,13 +552,22 @@ const SoulShardsPage: React.FC = () => {
                 onCellClick={handleCellClick}
                 selectedUnitId={selectedUnitId}
                 currentPlayer={currentPlayer}
-                disabled={overallPagePhase !== 'playing' || isLoading || (roomId !== null && localPlayer !== currentPlayer)}
+                disabled={overallPagePhase !== 'playing' || isLoading || localGamePhase === 'gameOver' || (roomId !== null && localPlayer !== currentPlayer)}
             />
+        ) : (
+         <Card className="w-full max-w-xl text-center shadow-xl my-4">
+          <CardHeader>
+            <div className="flex justify-center mb-2"><Construction className="h-12 w-12 text-accent animate-bounce" /></div>
+            <CardTitle className="text-xl font-heading">Soul Shards - Game Pending</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <CardDescription className="text-sm mb-3">Game setup is in progress or player selection is pending.</CardDescription>
             <Button onClick={handleFullReset} className="mt-4 text-sm">
               <RotateCcw className="mr-2 h-4 w-4" /> Back to Setup
             </Button>
           </CardContent>
         </Card>
+        )}
       </main>
 
       <footer className="text-center py-4 mt-auto text-sm text-muted-foreground">
@@ -464,3 +578,4 @@ const SoulShardsPage: React.FC = () => {
 };
 
 export default SoulShardsPage;
+

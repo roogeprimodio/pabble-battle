@@ -74,7 +74,7 @@ const SoulShardsBoard: React.FC<SoulShardsBoardProps> = ({
                 <Gem className={`absolute w-1/3 h-1/3 text-accent/70 opacity-60 animate-pulse z-0 ${unit ? 'bottom-0 right-0' : '' }`} />
               )}
               {unit && (
-                <div className={`transform scale-[0.45] sm:scale-[0.55] z-10 ${isSelectedUnit ? (unit.player === 1 ? 'animate-subtle-glow text-primary': 'animate-subtle-glow text-destructive') : ''}`}>
+                <div className={`transform scale-[0.6] sm:scale-[0.7] z-10 ${isSelectedUnit ? (unit.player === 1 ? 'animate-subtle-glow text-primary': 'animate-subtle-glow text-destructive') : ''}`}>
                   <PlayerPawnDisplay player={unit.player} size="normal" />
                 </div>
               )}

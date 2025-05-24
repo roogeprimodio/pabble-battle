@@ -7,3 +7,12 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# This rule helps with client-side routing in SPAs like Next.js.
+# It tells Netlify to serve the main application entry point (root)
+# for any path that doesn't directly match a static file.
+# The Next.js plugin should ideally handle this, but this can act as a fallback.
+[[redirects]]
+  from = "/*"
+  to = "/"
+  status = 200

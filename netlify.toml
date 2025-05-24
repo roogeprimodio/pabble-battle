@@ -1,0 +1,9 @@
+[functions]
+  directory = "netlify/functions"
+
+[build]
+  command = "npm run build"
+  publish = ".next" # For Next.js, the output directory is typically .next
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

@@ -1,7 +1,7 @@
 // src/app/games/tic-tac-toe/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -22,12 +22,15 @@ import {
 } from '@/lib/tic-tac-toe-rules';
 import { generateUniqueId } from '@/lib/utils';
 import { ThemeToggle } from '@/app/(components)/ThemeToggle';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import GameBanner from '@/app/games/nine-pebbles/components/GameBanner';
 
-type PagePhase = 'initial' | 'creatingRoom' | 'playing' | 'gameOver';
+type PagePhase = 'initial' | 'creatingRoom' | 'waitingForOpponent' | 'playing' | 'gameOver';
 
+// Placeholder for WebRTC Peer Connection
+let peerConnection: RTCPeerConnection | null = null;
+let dataChannel: RTCDataChannel | null = null;
 
 const TicTacToePage: React.FC = () => {
   const router = useRouter();
@@ -36,9 +39,9 @@ const TicTacToePage: React.FC = () => {
 
   const [board, setBoard] = useState<BoardState>(createInitialBoard());
   const [currentPlayer, setCurrentPlayer] = useState<Player>(1);
-  const [localPlayer, setLocalPlayer] = useState<Player | null>(null);
-  const [gamePhase, setGamePhase] = useState<TicTacToeGamePhase>('playing');
-  const [pagePhase, setPagePhase] = useState<PagePhase>('initial');
+  const [localPlayer, setLocalPlayer] = useState<Player | null>(null); // 1 if creator, 2 if joiner
+  const [gamePhase, setGamePhase] = useState<TicTacToeGamePhase>('playing'); // 'playing' or 'gameOver'
+  const [pagePhase, setPagePhase] = useState<PagePhase>('initial'); // Manages UI screens
 
   const [winner, setWinner] = useState<Player | null>(null);
   const [isDraw, setIsDraw] = useState<boolean>(false);
@@ -50,21 +53,145 @@ const TicTacToePage: React.FC = () => {
   const [message, setMessage] = useState<string>('Create or join a game room.');
   const [isLoading, setIsLoading] = useState(true);
 
+  // WebRTC Setup (Placeholders)
+  const initializePeerConnection = useCallback(async (isInitiator: boolean) => {
+    if (!roomId) return;
+    console.log('Initializing Peer Connection for room:', roomId, 'Is Initiator:', isInitiator);
+
+    // STUN servers (publicly available)
+    const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    peerConnection = new RTCPeerConnection(configuration);
+
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate && roomId) {
+        console.log('Sending ICE candidate:', event.candidate);
+        // Send candidate to the other peer via signaling server
+        await fetch('/.netlify/functions/signaling', {
+          method: 'POST',
+          body: JSON.stringify({ type: 'candidate', roomId, payload: event.candidate, sender: localPlayer }),
+        });
+      }
+    };
+
+    peerConnection.ondatachannel = (event) => {
+      console.log('Data channel received');
+      dataChannel = event.channel;
+      setupDataChannelEvents();
+    };
+    
+    if (isInitiator) {
+      console.log('Creating data channel');
+      dataChannel = peerConnection.createDataChannel('ticTacToeChannel');
+      setupDataChannelEvents();
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      console.log('Sending offer:', offer);
+      // Send offer to the other peer via signaling server
+      await fetch('/.netlify/functions/signaling', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'offer', roomId, payload: offer, sender: localPlayer }),
+      });
+    }
+    // Else (if not initiator), wait for an offer from the signaling server
+    // This part would involve listening for messages from the signaling server (e.g., via WebSockets or long polling)
+    // For now, we are simplifying and assuming the signaling server handles relay.
+
+  }, [roomId, localPlayer]);
+
+  const setupDataChannelEvents = () => {
+    if (!dataChannel) return;
+    dataChannel.onopen = () => {
+      console.log('Data channel OPEN');
+      toast({ title: "Connection Established!", description: "You can now play."});
+      if (pagePhase === 'waitingForOpponent') {
+        setPagePhase('playing');
+      }
+    };
+    dataChannel.onclose = () => {
+      console.log('Data channel CLOSED');
+      toast({ title: "Connection Closed", variant: "destructive"});
+    };
+    dataChannel.onmessage = (event) => {
+      console.log('Data channel message received:', event.data);
+      const receivedData = JSON.parse(event.data);
+      if (receivedData.type === 'move') {
+        handleOpponentMove(receivedData.board, receivedData.currentPlayer);
+      } else if (receivedData.type === 'reset') {
+        // Handle game reset from opponent
+         handleResetGame(false); // false to not re-initialize peer connection
+         toast({ title: "Opponent Reset Game", description: "The game has been reset." });
+      }
+      // Add more message types as needed (e.g., chat, game over confirmation)
+    };
+  };
+  
+  // Placeholder for handling messages from signaling server (e.g. offers, answers, candidates)
+  // This would typically be part of a WebSocket connection or long polling mechanism.
+  const handleSignalingMessage = useCallback(async (data: any) => {
+    if (!peerConnection || !roomId) return;
+
+    console.log('Received signaling data:', data);
+    if (data.type === 'offer' && data.sender !== localPlayer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        console.log('Sending answer:', answer);
+        await fetch('/.netlify/functions/signaling', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'answer', roomId, payload: answer, sender: localPlayer }),
+        });
+    } else if (data.type === 'answer' && data.sender !== localPlayer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
+    } else if (data.type === 'candidate' && data.sender !== localPlayer) {
+        if (data.payload) {
+           await peerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
+        }
+    }
+  }, [peerConnection, roomId, localPlayer]);
+  
+  // Effect to listen for signaling messages (conceptual - real implementation needs a persistent connection like WebSockets)
   useEffect(() => {
-    const existingRoomId = searchParams.get('room');
-    if (existingRoomId) {
-      setRoomId(existingRoomId.toUpperCase());
-      // If a room ID is in URL, assume this player is joining as Player 2.
-      // A robust system would involve signaling to confirm opponent and assign player roles.
-      setLocalPlayer(2); 
-      setCurrentPlayer(1); // Game starts with Player 1's turn
-      setPagePhase('playing');
-      toast({ title: "Joined Room", description: `You joined room: ${existingRoomId.toUpperCase()}. You are ${getPlayerThematicName(2)}. Waiting for Player 1.`});
+    if (pagePhase !== 'playing' && pagePhase !== 'waitingForOpponent' || !roomId) return;
+
+    // This is a placeholder for how you might poll a Netlify function for signals.
+    // A proper solution would use WebSockets or a more robust real-time mechanism.
+    const intervalId = setInterval(async () => {
+        try {
+            // Example: Fetch latest signal for the room.
+            // The signaling function would need to store messages temporarily if not using WebSockets.
+            // const response = await fetch(`/.netlify/functions/signaling?roomId=${roomId}&lastSignalTime=...`);
+            // if (response.ok) {
+            // const signalData = await response.json();
+            // if (signalData) handleSignalingMessage(signalData);
+            // }
+        } catch (error) {
+            console.error("Error polling for signals:", error);
+        }
+    }, 5000); // Poll every 5 seconds (example)
+
+    return () => clearInterval(intervalId);
+  }, [pagePhase, roomId, handleSignalingMessage]);
+
+
+  useEffect(() => {
+    const paramRoomId = searchParams.get('room');
+    if (paramRoomId) {
+      setRoomId(paramRoomId.toUpperCase());
+      // If a room ID is in URL, player joining is Player 2, initiator (Player 1) created the room.
+      // The actual localPlayer assignment happens in handleCreateRoom / handleJoinRoom.
+      // This useEffect primarily handles loading state if joining via URL.
+      if (pagePhase === 'initial') { // Only if we haven't set a phase yet
+          // Assume if room ID in URL and not creator, they are joining
+          // This logic is simplified; robust system needs better state management for roles
+          // For now, handleJoinRoom will set localPlayer to 2
+      }
+       setIsLoading(false);
     } else {
       setPagePhase('initial');
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [searchParams, toast]);
+  }, [searchParams, pagePhase]);
 
 
   const updateGameMessage = useCallback(() => {
@@ -73,9 +200,14 @@ const TicTacToePage: React.FC = () => {
       return;
     }
     if (pagePhase === 'creatingRoom' && roomId) {
-      setMessage(`Room ID: ${roomId}. Share this with your opponent! You are ${getPlayerThematicName(1)}.`);
+      setMessage(`Room ID: ${roomId}. Share this. You are ${getPlayerThematicName(1)} (Angels). Waiting to start...`);
       return;
     }
+    if (pagePhase === 'waitingForOpponent' && roomId) {
+      setMessage(`Room ID: ${roomId}. Share this if you haven't. Waiting for opponent to connect... You are ${getPlayerThematicName(localPlayer || 1)}.`);
+      return;
+    }
+
 
     if (pagePhase === 'playing' || pagePhase === 'gameOver') {
       if (winner) {
@@ -99,7 +231,7 @@ const TicTacToePage: React.FC = () => {
   }, [updateGameMessage]);
 
 
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
     setIsLoading(true);
     const newRoomId = generateUniqueId();
     setRoomId(newRoomId);
@@ -109,26 +241,21 @@ const TicTacToePage: React.FC = () => {
     setWinner(null);
     setIsDraw(false);
     setWinningCombination(null);
-    setGamePhase('playing');
-    setPagePhase('creatingRoom'); 
+    setGamePhase('playing'); // Game logic phase
+    setPagePhase('waitingForOpponent'); // UI phase
     
     router.push(`/games/tic-tac-toe?room=${newRoomId}`, { scroll: false });
     
     toast({
       title: "Room Created!",
-      description: `Room ID: ${newRoomId}. Share this. You are ${getPlayerThematicName(1)}.`,
+      description: `Room ID: ${newRoomId}. Share this. You are ${getPlayerThematicName(1)}. Waiting for opponent.`,
       className: "bg-primary/10 border-primary",
     });
+    await initializePeerConnection(true); // true because this player is the initiator
     setIsLoading(false);
   };
 
-  const handleStartGameAfterSharing = () => {
-    if (pagePhase === 'creatingRoom') {
-      setPagePhase('playing');
-    }
-  }
-
-  const handleJoinRoom = () => {
+  const handleJoinRoom = async () => {
     if (!inputRoomId.trim()) {
       toast({ title: "Error", description: "Please enter a Room ID.", variant: "destructive" });
       return;
@@ -137,13 +264,13 @@ const TicTacToePage: React.FC = () => {
     const cleanRoomId = inputRoomId.trim().toUpperCase();
     setRoomId(cleanRoomId);
     setLocalPlayer(2); 
-    setCurrentPlayer(1); 
+    setCurrentPlayer(1); // Game always starts with Player 1
     setBoard(createInitialBoard());
     setWinner(null);
     setIsDraw(false);
     setWinningCombination(null);
     setGamePhase('playing');
-    setPagePhase('playing');
+    setPagePhase('playing'); // Go directly to playing after joining for joiner
 
     router.push(`/games/tic-tac-toe?room=${cleanRoomId}`, { scroll: false });
     
@@ -152,11 +279,25 @@ const TicTacToePage: React.FC = () => {
       description: `You joined room: ${cleanRoomId}. You are ${getPlayerThematicName(2)}.`,
        className: "bg-destructive/10 border-destructive",
     });
+    await initializePeerConnection(false); // false because this player is joining
     setIsLoading(false);
   };
 
-  const handleResetGame = () => {
+  const handleResetGame = (shouldNotifyOpponent = true) => {
     setIsLoading(true);
+    if (shouldNotifyOpponent && dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(JSON.stringify({ type: 'reset' }));
+    }
+    // Close existing peer connection if any
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    if (dataChannel) {
+        dataChannel.close();
+        dataChannel = null;
+    }
+
     setPagePhase('initial');
     setBoard(createInitialBoard());
     setCurrentPlayer(1);
@@ -177,6 +318,32 @@ const TicTacToePage: React.FC = () => {
     setTimeout(() => setIsLoading(false), 300);
   };
 
+  const handleOpponentMove = (newBoard: BoardState, nextPlayer: Player) => {
+    setBoard(newBoard);
+    const currentWinner = checkWinner(newBoard);
+    if (currentWinner) {
+      setWinner(currentWinner);
+      setGamePhase('gameOver');
+      setPagePhase('gameOver');
+      toast({
+        title: "Game Over!",
+        description: `${getPlayerThematicName(currentWinner)} has won!`,
+        className: currentWinner === 1 ? "bg-primary/20 border-primary" : "bg-destructive/20 border-destructive",
+      });
+    } else if (isBoardFull(newBoard)) {
+      setIsDraw(true);
+      setGamePhase('gameOver');
+      setPagePhase('gameOver');
+      toast({
+        title: "Draw!",
+        description: "The game is a stalemate.",
+      });
+    } else {
+      setCurrentPlayer(nextPlayer);
+    }
+  };
+
+
   const handleCellClick = (index: number) => {
     if (pagePhase !== 'playing' || board[index] || winner || isDraw || gamePhase !== 'playing' || currentPlayer !== localPlayer) {
       if (pagePhase === 'playing' && !winner && !isDraw && currentPlayer !== localPlayer) {
@@ -191,8 +358,14 @@ const TicTacToePage: React.FC = () => {
     newBoard[index] = currentPlayer;
     setBoard(newBoard);
 
-    // TODO: Implement state synchronization for multiplayer (e.g., via WebRTC)
-    // For now, this updates local state and switches turns. Opponent won't see this change.
+    const nextPlayer = currentPlayer === 1 ? 2 : 1;
+
+    // Send move to opponent via WebRTC data channel
+    if (dataChannel && dataChannel.readyState === 'open') {
+      dataChannel.send(JSON.stringify({ type: 'move', board: newBoard, currentPlayer: nextPlayer }));
+    } else {
+      toast({ title: "Connection Issue", description: "Opponent not connected. Moves are local.", variant: "destructive"});
+    }
 
     const currentWinner = checkWinner(newBoard);
     if (currentWinner) {
@@ -213,7 +386,7 @@ const TicTacToePage: React.FC = () => {
         description: "The game is a stalemate.",
       });
     } else {
-      setCurrentPlayer(currentPlayer === 1 ? 2 : 1);
+      setCurrentPlayer(nextPlayer);
     }
   };
 
@@ -229,6 +402,7 @@ const TicTacToePage: React.FC = () => {
     }
   };
 
+  // Screen for initial room creation/joining
   const renderInitialScreen = () => (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
       <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
@@ -240,7 +414,7 @@ const TicTacToePage: React.FC = () => {
       <Card className="w-full max-w-md shadow-2xl text-center animate-fadeIn">
         <CardHeader className="p-4 sm:p-6">
           <div className="flex justify-center mb-3"> <Users className="w-16 h-16 text-primary animate-pulse" /> </div>
-          <CardTitle className="text-2xl sm:text-3xl font-bold text-primary font-heading">Tic-Tac-Toe Multiplayer</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-bold text-primary font-heading">Tic-Tac-Toe Online</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
           <p className="text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base">{message}</p>
@@ -255,7 +429,7 @@ const TicTacToePage: React.FC = () => {
               onChange={(e) => setInputRoomId(e.target.value.toUpperCase())}
               className="text-base"
             />
-            <Button onClick={handleJoinRoom} variant="secondary" className="text-base shadow-md">Join</Button>
+            <Button onClick={handleJoinRoom} variant="secondary" className="text-base shadow-md">Join Room</Button>
           </div>
         </CardContent>
       </Card>
@@ -263,15 +437,16 @@ const TicTacToePage: React.FC = () => {
     </div>
   );
 
-  const renderCreatingRoomScreen = () => (
+  // Screen while creator is waiting for opponent
+  const renderWaitingForOpponentScreen = () => (
      <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
         <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
-            <Button variant="outline" size="icon" aria-label="Back / Reset" onClick={handleResetGame}> <ArrowLeft className="h-5 w-5" /> </Button>
+            <Button variant="outline" size="icon" aria-label="Back / Reset" onClick={() => handleResetGame()}> <ArrowLeft className="h-5 w-5" /> </Button>
             <ThemeToggle />
         </header>
         <Card className="w-full max-w-md shadow-2xl text-center animate-fadeIn">
             <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-2xl sm:text-3xl font-bold text-primary font-heading">Room Created!</CardTitle>
+                <CardTitle className="text-2xl sm:text-3xl font-bold text-primary font-heading">Room Ready!</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
                 <p className="text-muted-foreground text-sm sm:text-base">Share this Room ID with your opponent:</p>
@@ -283,12 +458,13 @@ const TicTacToePage: React.FC = () => {
                 </div>
                  <CardDescription className="text-xs text-muted-foreground italic space-y-1">
                   <span>You are {getPlayerThematicName(1)}.</span><br/>
-                  <span>This version does not have automatic opponent detection or real-time updates.</span><br/>
-                  <span>Once your opponent has the Room ID and clicks "Join Game" on their end, you can click "Start Playing" below to begin playing on your screen. You'll need to coordinate turns manually.</span>
+                  <span>Waiting for opponent to join and connect...</span><br/>
+                  <span>Once connected, the game will start automatically.</span>
                 </CardDescription>
-                <Button onClick={handleStartGameAfterSharing} className="w-full text-base mt-4">
-                    Start Playing
-                </Button>
+                {/* Button to manually start if WebRTC auto-start is not reliable enough yet */}
+                {/* <Button onClick={() => setPagePhase('playing')} className="w-full text-base mt-4">
+                    Force Start Playing (Debug)
+                </Button> */}
             </CardContent>
         </Card>
         <footer className="text-center py-4 mt-6 text-sm text-muted-foreground"> <p>&copy; {new Date().getFullYear()} Pebble Arena</p> </footer>
@@ -322,16 +498,17 @@ const TicTacToePage: React.FC = () => {
 
   if (isLoading) return renderGameScreenSkeleton();
   if (pagePhase === 'initial') return renderInitialScreen();
-  if (pagePhase === 'creatingRoom') return renderCreatingRoomScreen();
+  if (pagePhase === 'creatingRoom' || pagePhase === 'waitingForOpponent') return renderWaitingForOpponentScreen();
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
       <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-2 sm:mb-3">
-        <Button variant="outline" size="icon" onClick={handleResetGame} aria-label="New Room / Reset">
+        <Button variant="outline" size="icon" onClick={() => handleResetGame()} aria-label="New Room / Reset">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center flex items-center gap-2 font-heading">
-          <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent animate-pulse" /> Tic-Tac-Toe <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary animate-pulse" />
+          <Swords className="h-6 w-6 sm:h-7 sm:h-7 text-accent animate-pulse" /> Tic-Tac-Toe <Zap className="h-6 w-6 sm:h-7 sm:h-7 text-primary animate-pulse" />
         </h1>
         <div className="flex items-center gap-2">
           {roomId && (
@@ -354,10 +531,10 @@ const TicTacToePage: React.FC = () => {
       {pagePhase === 'gameOver' && (
         <div className="w-full text-center my-2 sm:my-3">
           <Button 
-            onClick={handleResetGame} 
+            onClick={() => handleResetGame()} 
             className={`text-base py-2 sm:py-2.5 px-4 sm:px-6 ${winner === 1 ? 'bg-gradient-to-r from-primary via-primary/80 to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground' : winner === 2 ? 'bg-gradient-to-r from-destructive via-destructive/80 to-accent hover:from-destructive/90 hover:to-accent/90 text-destructive-foreground' : 'bg-accent hover:bg-accent/90 text-accent-foreground'} shadow-lg hover:shadow-xl transition-all duration-200`}
           >
-            <Sparkles className="mr-2 h-5 w-5" /> {isDraw ? 'New Room' : 'Play Again (New Room)'} <Sparkles className="ml-2 h-5 w-5" />
+            <Sparkles className="mr-2 h-5 w-5" /> {isDraw ? 'New Game' : 'Play Again'} <Sparkles className="ml-2 h-5 w-5" />
           </Button>
         </div>
       )}
@@ -366,7 +543,7 @@ const TicTacToePage: React.FC = () => {
         <TicTacToeBoard
           board={board}
           onCellClick={handleCellClick}
-          disabled={pagePhase !== 'playing' || gamePhase === 'gameOver' || currentPlayer !== localPlayer}
+          disabled={pagePhase !== 'playing' || gamePhase === 'gameOver' || currentPlayer !== localPlayer || (dataChannel?.readyState !== 'open' && !!roomId)}
           winningCombination={winningCombination}
           currentPlayer={currentPlayer}
         />
@@ -375,6 +552,11 @@ const TicTacToePage: React.FC = () => {
            <p className="text-center text-sm mt-3 text-amber-600 dark:text-amber-400 animate-pulse">
              Waiting for {getPlayerThematicName(currentPlayer)}'s move...
            </p>
+         )}
+         {pagePhase === 'playing' && roomId && dataChannel?.readyState !== 'open' && (
+            <p className="text-center text-sm mt-3 text-orange-500 dark:text-orange-400">
+                Attempting to connect to opponent...
+            </p>
          )}
       </main>
 

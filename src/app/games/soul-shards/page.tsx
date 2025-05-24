@@ -36,8 +36,14 @@ const initialPlayerState = (player: Player): PlayerStateSoulShards => ({
   player,
   name: getPlayerThematicNameSoulShards(player),
   shardsCollected: 0,
-  faithOrDespair: 100, 
-  units: [], 
+  faithOrDespair: 100,
+  units: player === 1 ? [ // Sample units for Player 1
+    { id: `p1_harv_${generateUniqueId(4)}`, player: 1, type: 'Harvester', health: 10, attack: 1, position: { r: 1, c: 1 } },
+    { id: `p1_guard_${generateUniqueId(4)}`, player: 1, type: 'Guardian', health: 20, attack: 3, position: { r: 0, c: Math.floor(BOARD_COLS / 2) } },
+  ] : [ // Sample units for Player 2
+    { id: `p2_harv_${generateUniqueId(4)}`, player: 2, type: 'Harvester', health: 10, attack: 1, position: { r: BOARD_ROWS - 2, c: BOARD_COLS - 2 } },
+    { id: `p2_guard_${generateUniqueId(4)}`, player: 2, type: 'Guardian', health: 20, attack: 3, position: { r: BOARD_ROWS - 1, c: Math.floor(BOARD_COLS / 2) } },
+  ],
 });
 
 
@@ -68,7 +74,7 @@ const SoulShardsPage: React.FC = () => {
     const existingRoomId = searchParams.get('room');
     if (existingRoomId) {
       setRoomId(existingRoomId.toUpperCase());
-      setLocalPlayer(2); 
+      setLocalPlayer(2);
       setCurrentPlayer(1);
       setOverallPagePhase('playing');
       setLocalGamePhase('deployment'); // Or 'playing' depending on Soul Shards rules
@@ -96,7 +102,7 @@ const SoulShardsPage: React.FC = () => {
       setMessage("The battle for Soul Shards ends in a stalemate!");
     } else if (localGamePhase === 'deployment') {
        setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}: Deploy your units. (Online: You are ${localPlayer ? getPlayerThematicNameSoulShards(localPlayer) : 'Observer'})`);
-    } else { 
+    } else {
       setMessage(`${getPlayerThematicNameSoulShards(currentPlayer)}'s turn. (Online: You are ${localPlayer ? getPlayerThematicNameSoulShards(localPlayer) : 'Observer'})`);
     }
   }, [winner, currentPlayer, localGamePhase, overallPagePhase, roomId, localPlayer]);
@@ -147,7 +153,7 @@ const SoulShardsPage: React.FC = () => {
     });
     setTimeout(() => setIsLoading(false), 300);
   };
-  
+
   const handleCreateRoomOnline = () => {
     setIsLoading(true);
     resetGameState();
@@ -179,7 +185,7 @@ const SoulShardsPage: React.FC = () => {
     toast({ title: "Joined Soul Shards Room!", description: `Room: ${cleanRoomId}. You are ${getPlayerThematicNameSoulShards(2)}. ${getPlayerThematicNameSoulShards(1)} starts.`});
     setIsLoading(false);
   };
-  
+
   const copyRoomIdToClipboard = () => {
     if (roomId) {
       navigator.clipboard.writeText(roomId)
@@ -198,7 +204,7 @@ const SoulShardsPage: React.FC = () => {
     toast({ title: "Cell Clicked (Soul Shards)", description: `Cell (${r}, ${c}). Current player: ${currentPlayer}. Phase: ${localGamePhase}`});
     // Future game logic here
   };
-  
+
   const renderInitialSetupScreen = () => (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
       <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
@@ -239,7 +245,7 @@ const SoulShardsPage: React.FC = () => {
        <footer className="text-center py-4 mt-6 text-sm text-muted-foreground">&copy; {new Date().getFullYear()} Pebble Arena - Soul Shards</footer>
     </div>
   );
-  
+
   const renderOnlineRoomSetupScreen = () => (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4 items-center justify-center">
       <header className="absolute top-4 left-4 right-4 flex justify-between items-center">
@@ -291,8 +297,8 @@ const SoulShardsPage: React.FC = () => {
   const renderGameScreenSkeleton = () => (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/20 p-2 sm:p-4">
       <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-3 sm:mb-4">
-        <Skeleton className="h-8 w-8 rounded-md" /> 
-        <Skeleton className="h-7 w-48 rounded-md" /> 
+        <Skeleton className="h-8 w-8 rounded-md" />
+        <Skeleton className="h-7 w-48 rounded-md" />
         <div className="flex items-center gap-2"><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-8 w-8 rounded-md" /></div>
       </header>
       <GameBanner />
@@ -324,8 +330,8 @@ const SoulShardsPage: React.FC = () => {
       <header className="flex justify-between items-center py-3 px-1 sm:px-2 mb-2 sm:mb-3">
         <Button variant="outline" size="icon" aria-label="Back/New Game" onClick={handleFullReset}><ArrowLeft className="h-5 w-5" /></Button>
         <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center flex items-center gap-2 font-heading">
-          <Swords className="h-6 w-6 sm:h-7 sm:w-7 text-accent animate-pulse" /> Soul Shards
-          <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-primary animate-pulse" />
+          <Swords className="h-6 w-6 sm:h-7 sm:h-7 text-accent animate-pulse" /> Soul Shards
+          <Zap className="h-6 w-6 sm:h-7 sm:h-7 text-primary animate-pulse" />
            {roomId && <span className="text-xs font-normal text-muted-foreground hidden sm:inline-block">(Room: {roomId})</span>}
         </h1>
         <div className="flex items-center gap-2">
@@ -333,7 +339,7 @@ const SoulShardsPage: React.FC = () => {
           <ThemeToggle />
         </div>
       </header>
-      
+
       <GameBanner />
 
       <SoulShardsStatus
@@ -344,7 +350,7 @@ const SoulShardsPage: React.FC = () => {
         winner={winner}
         message={message}
       />
-      
+
       {overallPagePhase === 'gameOver' && winner && (
         <div className="w-full text-center my-2 sm:my-3 p-4 rounded-lg shadow-lg bg-card">
            <AlertTitle className={`text-2xl font-bold mb-2 ${winner === 1 ? 'text-primary' : 'text-destructive'}`}>
@@ -372,7 +378,7 @@ const SoulShardsPage: React.FC = () => {
             <CardDescription className="text-sm mb-3">Core game mechanics are being forged. Basic board interaction is enabled.</CardDescription>
              <SoulShardsBoard
                 board={board}
-                units={currentPlayer === 1 ? player1State.units : player2State.units} 
+                units={[...player1State.units, ...player2State.units]}
                 shards={shards}
                 onCellClick={handleCellClick}
                 selectedUnitId={selectedUnitId}
@@ -394,3 +400,5 @@ const SoulShardsPage: React.FC = () => {
 };
 
 export default SoulShardsPage;
+
+    

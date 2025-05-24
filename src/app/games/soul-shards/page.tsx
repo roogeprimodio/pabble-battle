@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, RotateCcw, ShieldQuestion, Swords, Zap, Sparkles, Construction, Users, Copy, PartyPopper, Gem } from 'lucide-react'; // Added Gem
+import { ArrowLeft, RotateCcw, ShieldQuestion, Swords, Zap, Sparkles, Construction, Users, Copy, PartyPopper, Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import SoulShardsBoard from './components/SoulShardsBoard';
 import SoulShardsStatus from './components/SoulShardsStatus';
@@ -37,13 +37,7 @@ const initialPlayerState = (player: Player): PlayerStateSoulShards => ({
   name: getPlayerThematicNameSoulShards(player),
   shardsCollected: 0,
   faithOrDespair: 100,
-  units: player === 1 ? [ 
-    { id: `p1_harv_${generateUniqueId(4)}`, player: 1, type: 'Harvester', health: 10, attack: 1, position: { r: 1, c: 1 } },
-    { id: `p1_guard_${generateUniqueId(4)}`, player: 1, type: 'Guardian', health: 20, attack: 3, position: { r: 0, c: Math.floor(BOARD_COLS / 2) } },
-  ] : [ 
-    { id: `p2_harv_${generateUniqueId(4)}`, player: 2, type: 'Harvester', health: 10, attack: 1, position: { r: BOARD_ROWS - 2, c: BOARD_COLS - 2 } },
-    { id: `p2_guard_${generateUniqueId(4)}`, player: 2, type: 'Guardian', health: 20, attack: 3, position: { r: BOARD_ROWS - 1, c: Math.floor(BOARD_COLS / 2) } },
-  ],
+  units: [], // Start with no units
 });
 
 
@@ -116,18 +110,6 @@ const SoulShardsPage: React.FC = () => {
     const newBoard = createInitialSoulShardsBoard();
     const p1Initial = initialPlayerState(1);
     const p2Initial = initialPlayerState(2);
-
-    // Place initial units on the board representation as well
-    p1Initial.units.forEach(unit => {
-      if (newBoard[unit.position.r] && newBoard[unit.position.r][unit.position.c]) {
-        newBoard[unit.position.r][unit.position.c].unitId = unit.id;
-      }
-    });
-    p2Initial.units.forEach(unit => {
-       if (newBoard[unit.position.r] && newBoard[unit.position.r][unit.position.c]) {
-        newBoard[unit.position.r][unit.position.c].unitId = unit.id;
-      }
-    });
     
     setBoard(newBoard);
     setPlayer1State(p1Initial);

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, RotateCcw, ShieldQuestion, Swords, Zap, Sparkles, Construction, Users, Copy, PartyPopper } from 'lucide-react';
+import { ArrowLeft, RotateCcw, ShieldQuestion, Swords, Zap, Sparkles, Construction, Users, Copy, PartyPopper, Gem } from 'lucide-react'; // Added Gem
 import { useToast } from '@/hooks/use-toast';
 import SoulShardsBoard from './components/SoulShardsBoard';
 import SoulShardsStatus from './components/SoulShardsStatus';
